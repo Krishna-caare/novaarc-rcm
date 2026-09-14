@@ -31,3 +31,6 @@ uvicorn_err.log
 
 # Docker
 *.env.local
+
+# Local Netlify folder
+.netlify

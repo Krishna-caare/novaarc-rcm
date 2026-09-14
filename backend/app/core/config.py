@@ -4,9 +4,9 @@ from functools import lru_cache
 
 class Settings(BaseSettings):
     database_url: str
-    supabase_url: str
-    supabase_publishable_key: str
-    supabase_secret_key: str
+    supabase_url: str = ""
+    supabase_publishable_key: str = ""
+    supabase_secret_key: str = ""
     redis_url: str = "redis://localhost:6379/0"
     secret_key: str
     algorithm: str = "HS256"
