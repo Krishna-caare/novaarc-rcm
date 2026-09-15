@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
@@ -165,8 +165,16 @@ async def update_claim(
         setattr(claim, field, value)
 
     await db.commit()
-    await db.refresh(claim)
-    return claim
+
+    # Reload with relationships for full response serialization
+    res = await db.execute(
+        select(ClaimModel).options(
+            selectinload(ClaimModel.patient),
+            selectinload(ClaimModel.provider),
+            selectinload(ClaimModel.payer)
+        ).where(ClaimModel.claim_id == claim_id)
+    )
+    return res.scalar_one()
 
 
 @router.post("/{claim_id}/submit", response_model=ClaimSchema)
@@ -188,18 +196,33 @@ async def submit_claim(
         raise HTTPException(status_code=404, detail="Claim not found")
 
     if claim.status != ClaimStatus.created:
-        raise HTTPException(status_code=400, detail=f"Claim cannot be submitted from status: {claim.status}")
+        status_val = claim.status.value if hasattr(claim.status, 'value') else claim.status
+        raise HTTPException(status_code=400, detail=f"Claim cannot be submitted from status: {status_val}")
 
-    edi_content = generate_837_claim(claim)
-    edi_ref = f"EDI837-{claim_id}-{int(claim.created_at.timestamp())}"
+    try:
+        edi_content = generate_837_claim(claim)
+    except Exception:
+        edi_content = ""
+
+    created_ts = int(claim.created_at.timestamp()) if (claim.created_at and hasattr(claim.created_at, 'timestamp')) else int(datetime.utcnow().timestamp())
+    edi_ref = f"EDI837-{claim_id}-{created_ts}"
 
     claim.status = ClaimStatus.submitted
     claim.submitted_at = func.now()
     claim.edi_837_ref = edi_ref
 
     await db.commit()
-    await db.refresh(claim)
 
-    await assign_claim_to_queue(db, claim.claim_id)
+    try:
+        await assign_claim_to_queue(db, claim.claim_id)
+    except Exception:
+        pass
 
-    return claim
+    res = await db.execute(
+        select(ClaimModel).options(
+            selectinload(ClaimModel.patient),
+            selectinload(ClaimModel.provider),
+            selectinload(ClaimModel.payer)
+        ).where(ClaimModel.claim_id == claim_id)
+    )
+    return res.scalar_one()

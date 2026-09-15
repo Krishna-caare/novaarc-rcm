@@ -26,6 +26,7 @@ app = FastAPI(
 # Build allowed origins: always include localhost, Netlify domains, plus FRONTEND_URL
 _allowed_origins = [
     "http://localhost:5173",
+    "http://localhost:5174",
     "http://localhost:3000",
     "https://novaarc.netlify.app",
     "https://majestic-seahorse-c3e878.netlify.app",
