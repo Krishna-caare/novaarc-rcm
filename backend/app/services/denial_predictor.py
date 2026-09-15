@@ -5,7 +5,7 @@ from typing import Optional
 import numpy as np
 import pandas as pd
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from decimal import Decimal
 
 from app.models import Claim, Denial, ClaimStatus
