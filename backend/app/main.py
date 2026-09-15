@@ -23,21 +23,26 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Build allowed origins: always include localhost, plus any production URLs
+# Build allowed origins: always include localhost, Netlify domains, plus FRONTEND_URL
 _allowed_origins = [
     "http://localhost:5173",
     "http://localhost:3000",
+    "https://novaarc.netlify.app",
+    "https://majestic-seahorse-c3e878.netlify.app",
 ]
 
-# FRONTEND_URL env var lets Railway/Netlify URLs be whitelisted at deploy time
-# e.g. FRONTEND_URL=https://novaarc.netlify.app
+# FRONTEND_URL env var lets additional URLs be whitelisted at deploy time (comma-separated supported)
 _frontend_url = os.getenv("FRONTEND_URL", "")
 if _frontend_url:
-    _allowed_origins.append(_frontend_url.rstrip("/"))
+    for url in _frontend_url.split(","):
+        clean_url = url.strip().rstrip("/")
+        if clean_url and clean_url not in _allowed_origins:
+            _allowed_origins.append(clean_url)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
+    allow_origin_regex=r"https://.*\.netlify\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

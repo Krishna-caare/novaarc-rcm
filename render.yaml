@@ -22,7 +22,7 @@ services:
       - key: LOG_LEVEL
         value: INFO
       - key: FRONTEND_URL
-        value: https://majestic-seahorse-c3e878.netlify.app
+        value: https://novaarc.netlify.app
       - key: OPENROUTER_API_KEY
         value: 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
 
