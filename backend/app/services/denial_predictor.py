@@ -92,7 +92,13 @@ denial_predictor = DenialPredictor()
 
 
 async def get_denial_prediction(db: AsyncSession, claim_id: int) -> tuple[Decimal, dict, list[str]]:
-    result = await db.execute(select(Claim).where(Claim.claim_id == claim_id))
+    from sqlalchemy.orm import selectinload
+    result = await db.execute(
+        select(Claim).options(
+            selectinload(Claim.provider),
+            selectinload(Claim.payer)
+        ).where(Claim.claim_id == claim_id)
+    )
     claim = result.scalar_one_or_none()
     if not claim:
         raise ValueError(f"Claim {claim_id} not found")
