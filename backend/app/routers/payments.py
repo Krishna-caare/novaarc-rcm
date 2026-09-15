@@ -87,8 +87,14 @@ async def create_payment(
         claim.status = ClaimStatus.paid
 
     await db.commit()
-    await db.refresh(payment)
-    return payment
+
+    res = await db.execute(
+        select(PaymentModel).options(
+            selectinload(PaymentModel.payer),
+            selectinload(PaymentModel.claim)
+        ).where(PaymentModel.payment_id == payment.payment_id)
+    )
+    return res.scalar_one()
 
 
 @router.get("/{payment_id}", response_model=PaymentSchema)
@@ -137,5 +143,11 @@ async def update_payment(
                 claim.status = ClaimStatus.paid
 
     await db.commit()
-    await db.refresh(payment)
-    return payment
+
+    res = await db.execute(
+        select(PaymentModel).options(
+            selectinload(PaymentModel.payer),
+            selectinload(PaymentModel.claim)
+        ).where(PaymentModel.payment_id == payment.payment_id)
+    )
+    return res.scalar_one()
