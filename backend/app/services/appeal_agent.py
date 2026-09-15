@@ -35,27 +35,30 @@ async def call_openrouter(messages: list[dict], temperature: float = 0.4) -> dic
     if not OPENROUTER_API_KEY:
         return {"error": "OpenRouter API key not configured"}
 
-    async with httpx.AsyncClient(timeout=60.0) as client:
-        response = await client.post(
-            f"{OPENROUTER_BASE_URL}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                "Content-Type": "application/json",
-                "HTTP-Referer": "https://novaarc.local",
-                "X-Title": "NovaArc RCM"
-            },
-            json={
-                "model": MODEL,
-                "messages": messages,
-                "temperature": temperature,
-                "response_format": {"type": "json_object"},
-                "reasoning": {"enabled": True}
-            }
-        )
-        response.raise_for_status()
-        data = response.json()
-        content = data["choices"][0]["message"]["content"]
-        return json.loads(content)
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            response = await client.post(
+                f"{OPENROUTER_BASE_URL}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://novaarc.local",
+                    "X-Title": "NovaArc RCM"
+                },
+                json={
+                    "model": MODEL,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "response_format": {"type": "json_object"},
+                    "reasoning": {"enabled": True}
+                }
+            )
+            response.raise_for_status()
+            data = response.json()
+            content = data["choices"][0]["message"]["content"]
+            return json.loads(content)
+    except Exception as e:
+        return {"error": str(e)}
 
 
 async def draft_appeal_letter(denial: Denial, additional_context: str = None) -> tuple[str, Decimal, bool]:
