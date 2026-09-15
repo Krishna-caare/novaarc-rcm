@@ -149,6 +149,9 @@ class Claim(ClaimBase):
     denial_probability: Optional[Decimal] = None
     created_at: datetime
     updated_at: datetime
+    patient: Optional[Patient] = None
+    provider: Optional[Provider] = None
+    payer: Optional[Payer] = None
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -214,6 +217,7 @@ class PaymentUpdate(BaseModel):
 
 class Payment(PaymentBase):
     payment_id: int
+    payer: Optional[Payer] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -35,6 +35,88 @@ export function ClaimsPage() {
   const [showEdit, setShowEdit] = useState(false);
   const [editData, setEditData] = useState<Partial<Claim>>({});
   const [actionLoading, setActionLoading] = useState(false);
+  const [showNewClaim, setShowNewClaim] = useState(false);
+  const [newClaimLoading, setNewClaimLoading] = useState(false);
+  const [newClaimError, setNewClaimError] = useState<string | null>(null);
+  const [refData, setRefData] = useState<{
+    patients: Array<{ patient_id: number; mrn: string; payer_id?: number }>;
+    providers: Array<{ provider_id: number; name: string; specialty?: string }>;
+    payers: Array<{ payer_id: number; name: string }>;
+  }>({ patients: [], providers: [], payers: [] });
+
+  const [newClaimForm, setNewClaimForm] = useState({
+    patient_id: '',
+    provider_id: '',
+    payer_id: '',
+    date_of_service: new Date().toISOString().split('T')[0],
+    charge_amount: '',
+    cpt_codes: '99213',
+    icd10_codes: 'I10',
+    modifiers: '',
+  });
+
+  useEffect(() => {
+    const loadRefData = async () => {
+      try {
+        const data = await api.getReferenceData();
+        setRefData(data);
+        if (data.patients.length > 0) {
+          setNewClaimForm(prev => ({
+            ...prev,
+            patient_id: prev.patient_id || String(data.patients[0].patient_id),
+            provider_id: prev.provider_id || String(data.providers[0]?.provider_id || 1),
+            payer_id: prev.payer_id || String(data.patients[0]?.payer_id || data.payers[0]?.payer_id || 1),
+          }));
+        }
+      } catch (e) {
+        console.warn('Failed to load reference data', e);
+      }
+    };
+    loadRefData();
+  }, []);
+
+  const handleCreateClaim = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setNewClaimError(null);
+    if (!newClaimForm.patient_id || !newClaimForm.provider_id || !newClaimForm.payer_id || !newClaimForm.charge_amount) {
+      setNewClaimError('Please fill in all required fields (Patient, Provider, Payer, Charge Amount)');
+      return;
+    }
+    const charge = parseFloat(newClaimForm.charge_amount);
+    if (isNaN(charge) || charge <= 0) {
+      setNewClaimError('Please enter a valid positive charge amount');
+      return;
+    }
+    setNewClaimLoading(true);
+    try {
+      await api.createClaim({
+        patient_id: parseInt(newClaimForm.patient_id),
+        provider_id: parseInt(newClaimForm.provider_id),
+        payer_id: parseInt(newClaimForm.payer_id),
+        date_of_service: newClaimForm.date_of_service,
+        charge_amount: charge,
+        cpt_codes: newClaimForm.cpt_codes.split(',').map(s => s.trim()).filter(Boolean),
+        icd10_codes: newClaimForm.icd10_codes.split(',').map(s => s.trim()).filter(Boolean),
+        modifiers: newClaimForm.modifiers.split(',').map(s => s.trim()).filter(Boolean),
+      });
+      setShowNewClaim(false);
+      setNewClaimForm({
+        patient_id: refData.patients[0] ? String(refData.patients[0].patient_id) : '',
+        provider_id: refData.providers[0] ? String(refData.providers[0].provider_id) : '',
+        payer_id: refData.payers[0] ? String(refData.payers[0].payer_id) : '',
+        date_of_service: new Date().toISOString().split('T')[0],
+        charge_amount: '',
+        cpt_codes: '99213',
+        icd10_codes: 'I10',
+        modifiers: '',
+      });
+      await fetchClaims();
+    } catch (err: any) {
+      setNewClaimError(err.response?.data?.detail || 'Failed to create claim');
+    } finally {
+      setNewClaimLoading(false);
+    }
+  };
 
   const fetchClaims = async () => {
     setLoading(true);
@@ -138,7 +220,7 @@ export function ClaimsPage() {
               <Filter className="w-4 h-4 mr-2" />
               Filters
             </button>
-            <button className="btn-primary">
+            <button onClick={() => setShowNewClaim(true)} className="btn-primary">
               <Plus className="w-4 h-4 mr-2" />
               New Claim
             </button>
@@ -362,6 +444,181 @@ export function ClaimsPage() {
                   <button onClick={handleEditSave} disabled={actionLoading} className="btn-primary">{actionLoading ? 'Saving...' : 'Save'}</button>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {showNewClaim && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-semibold text-lg text-slate-900">Create New Claim</h3>
+                <button onClick={() => setShowNewClaim(false)} className="p-2 hover:bg-slate-100 rounded text-slate-500">✕</button>
+              </div>
+              <form onSubmit={handleCreateClaim} className="p-4 space-y-4">
+                {newClaimError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
+                    {newClaimError}
+                  </div>
+                )}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Patient *</label>
+                    {refData.patients.length > 0 ? (
+                      <select
+                        className="input"
+                        value={newClaimForm.patient_id}
+                        onChange={e => {
+                          const pid = e.target.value;
+                          const patient = refData.patients.find(p => String(p.patient_id) === pid);
+                          setNewClaimForm(prev => ({
+                            ...prev,
+                            patient_id: pid,
+                            payer_id: patient?.payer_id ? String(patient.payer_id) : prev.payer_id
+                          }));
+                        }}
+                        required
+                      >
+                        {refData.patients.map(p => (
+                          <option key={p.patient_id} value={p.patient_id}>
+                            Patient #{p.patient_id} ({p.mrn})
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="number"
+                        placeholder="Patient ID (e.g. 1)"
+                        className="input"
+                        value={newClaimForm.patient_id}
+                        onChange={e => setNewClaimForm({ ...newClaimForm, patient_id: e.target.value })}
+                        required
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="label">Provider *</label>
+                    {refData.providers.length > 0 ? (
+                      <select
+                        className="input"
+                        value={newClaimForm.provider_id}
+                        onChange={e => setNewClaimForm({ ...newClaimForm, provider_id: e.target.value })}
+                        required
+                      >
+                        {refData.providers.map(pr => (
+                          <option key={pr.provider_id} value={pr.provider_id}>
+                            {pr.name} {pr.specialty ? `(${pr.specialty})` : ''}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="number"
+                        placeholder="Provider ID (e.g. 1)"
+                        className="input"
+                        value={newClaimForm.provider_id}
+                        onChange={e => setNewClaimForm({ ...newClaimForm, provider_id: e.target.value })}
+                        required
+                      />
+                    )}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">Payer *</label>
+                    {refData.payers.length > 0 ? (
+                      <select
+                        className="input"
+                        value={newClaimForm.payer_id}
+                        onChange={e => setNewClaimForm({ ...newClaimForm, payer_id: e.target.value })}
+                        required
+                      >
+                        {refData.payers.map(py => (
+                          <option key={py.payer_id} value={py.payer_id}>
+                            {py.name}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type="number"
+                        placeholder="Payer ID (e.g. 1)"
+                        className="input"
+                        value={newClaimForm.payer_id}
+                        onChange={e => setNewClaimForm({ ...newClaimForm, payer_id: e.target.value })}
+                        required
+                      />
+                    )}
+                  </div>
+                  <div>
+                    <label className="label">Date of Service *</label>
+                    <input
+                      type="date"
+                      className="input"
+                      value={newClaimForm.date_of_service}
+                      onChange={e => setNewClaimForm({ ...newClaimForm, date_of_service: e.target.value })}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label">Charge Amount ($) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 250.00"
+                    className="input"
+                    value={newClaimForm.charge_amount}
+                    onChange={e => setNewClaimForm({ ...newClaimForm, charge_amount: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="label">CPT Codes (comma separated)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 99213, 99214"
+                      className="input"
+                      value={newClaimForm.cpt_codes}
+                      onChange={e => setNewClaimForm({ ...newClaimForm, cpt_codes: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="label">ICD-10 Codes (comma separated)</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. I10, E11.9"
+                      className="input"
+                      value={newClaimForm.icd10_codes}
+                      onChange={e => setNewClaimForm({ ...newClaimForm, icd10_codes: e.target.value })}
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="label">Modifiers (optional, comma separated)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. 25, 59"
+                    className="input"
+                    value={newClaimForm.modifiers}
+                    onChange={e => setNewClaimForm({ ...newClaimForm, modifiers: e.target.value })}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <button type="button" onClick={() => setShowNewClaim(false)} className="btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={newClaimLoading} className="btn-primary">
+                    {newClaimLoading ? 'Creating...' : 'Create Claim'}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         )}

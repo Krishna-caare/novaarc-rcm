@@ -14,11 +14,82 @@ export function PaymentsPage() {
   const [pagination, setPagination] = useState({ page: 1, limit: 20 });
   const [filters, setFilters] = useState({ claim_id: '', payer_id: '', date_from: '', date_to: '' });
   const [showFilters, setShowFilters] = useState(false);
+  const [showPostPayment, setShowPostPayment] = useState(false);
+  const [postPaymentLoading, setPostPaymentLoading] = useState(false);
+  const [postPaymentError, setPostPaymentError] = useState<string | null>(null);
+  const [payers, setPayers] = useState<Array<{ payer_id: number; name: string }>>([]);
+
+  const [postPaymentForm, setPostPaymentForm] = useState({
+    claim_id: '',
+    amount: '',
+    payer_id: '',
+    posted_date: new Date().toISOString().split('T')[0],
+    remittance_ref: '',
+  });
 
   useEffect(() => {
     fetchPayments();
     fetchSummary();
   }, [pagination.page, filters.claim_id, filters.payer_id, filters.date_from, filters.date_to]);
+
+  useEffect(() => {
+    const loadPayers = async () => {
+      try {
+        const data = await api.getReferenceData();
+        if (data.payers) {
+          setPayers(data.payers);
+          if (data.payers.length > 0) {
+            setPostPaymentForm(prev => ({
+              ...prev,
+              payer_id: prev.payer_id || String(data.payers[0].payer_id),
+            }));
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to load payers', e);
+      }
+    };
+    loadPayers();
+  }, []);
+
+  const handlePostPayment = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPostPaymentError(null);
+    if (!postPaymentForm.claim_id || !postPaymentForm.amount || !postPaymentForm.payer_id) {
+      setPostPaymentError('Please fill in Claim ID, Amount, and Payer');
+      return;
+    }
+    const amt = parseFloat(postPaymentForm.amount);
+    if (isNaN(amt) || amt <= 0) {
+      setPostPaymentError('Please enter a valid positive payment amount');
+      return;
+    }
+    setPostPaymentLoading(true);
+    try {
+      const remRef = postPaymentForm.remittance_ref.trim() || `RMT${Math.floor(100000 + Math.random() * 900000)}`;
+      await api.createPayment({
+        claim_id: parseInt(postPaymentForm.claim_id),
+        amount: amt,
+        payer_id: parseInt(postPaymentForm.payer_id),
+        posted_date: postPaymentForm.posted_date || undefined,
+        remittance_ref: remRef,
+      });
+      setShowPostPayment(false);
+      setPostPaymentForm({
+        claim_id: '',
+        amount: '',
+        payer_id: payers[0] ? String(payers[0].payer_id) : '',
+        posted_date: new Date().toISOString().split('T')[0],
+        remittance_ref: '',
+      });
+      await fetchPayments();
+      await fetchSummary();
+    } catch (err: any) {
+      setPostPaymentError(err.response?.data?.detail || 'Failed to post payment');
+    } finally {
+      setPostPaymentLoading(false);
+    }
+  };
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -69,7 +140,7 @@ export function PaymentsPage() {
               <Filter className="w-4 h-4 mr-2" />
               Filters
             </button>
-            <button className="btn-primary">
+            <button onClick={() => setShowPostPayment(true)} className="btn-primary">
               <Plus className="w-4 h-4 mr-2" />
               Post Payment
             </button>
@@ -274,6 +345,107 @@ export function PaymentsPage() {
               </div>
             </CardContent>
           </Card>
+        )}
+
+        {showPostPayment && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+            <div className="bg-white rounded-xl max-w-md w-full shadow-2xl overflow-y-auto max-h-[90vh]">
+              <div className="p-4 border-b flex justify-between items-center">
+                <h3 className="font-semibold text-lg text-slate-900">Post New Payment</h3>
+                <button onClick={() => setShowPostPayment(false)} className="p-2 hover:bg-slate-100 rounded text-slate-500">✕</button>
+              </div>
+              <form onSubmit={handlePostPayment} className="p-4 space-y-4">
+                {postPaymentError && (
+                  <div className="bg-red-50 border border-red-200 text-red-700 text-sm p-3 rounded-lg">
+                    {postPaymentError}
+                  </div>
+                )}
+                <div>
+                  <label className="label">Claim ID *</label>
+                  <input
+                    type="number"
+                    placeholder="e.g. 52"
+                    className="input"
+                    value={postPaymentForm.claim_id}
+                    onChange={e => setPostPaymentForm({ ...postPaymentForm, claim_id: e.target.value })}
+                    required
+                  />
+                  <p className="text-xs text-slate-500 mt-1">Enter the Claim ID number (e.g. 52 for CLM-52)</p>
+                </div>
+
+                <div>
+                  <label className="label">Payment Amount ($) *</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    placeholder="e.g. 1500.00"
+                    className="input"
+                    value={postPaymentForm.amount}
+                    onChange={e => setPostPaymentForm({ ...postPaymentForm, amount: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Payer *</label>
+                  {payers.length > 0 ? (
+                    <select
+                      className="input"
+                      value={postPaymentForm.payer_id}
+                      onChange={e => setPostPaymentForm({ ...postPaymentForm, payer_id: e.target.value })}
+                      required
+                    >
+                      {payers.map(p => (
+                        <option key={p.payer_id} value={p.payer_id}>
+                          {p.name} (ID: {p.payer_id})
+                        </option>
+                      ))}
+                    </select>
+                  ) : (
+                    <input
+                      type="number"
+                      placeholder="Payer ID (e.g. 1)"
+                      className="input"
+                      value={postPaymentForm.payer_id}
+                      onChange={e => setPostPaymentForm({ ...postPaymentForm, payer_id: e.target.value })}
+                      required
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label className="label">Posted Date *</label>
+                  <input
+                    type="date"
+                    className="input"
+                    value={postPaymentForm.posted_date}
+                    onChange={e => setPostPaymentForm({ ...postPaymentForm, posted_date: e.target.value })}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="label">Remittance Reference (optional)</label>
+                  <input
+                    type="text"
+                    placeholder="e.g. RMT482910 (auto-generated if blank)"
+                    className="input"
+                    value={postPaymentForm.remittance_ref}
+                    onChange={e => setPostPaymentForm({ ...postPaymentForm, remittance_ref: e.target.value })}
+                  />
+                </div>
+
+                <div className="flex justify-end gap-2 pt-2 border-t">
+                  <button type="button" onClick={() => setShowPostPayment(false)} className="btn-secondary">
+                    Cancel
+                  </button>
+                  <button type="submit" disabled={postPaymentLoading} className="btn-primary">
+                    {postPaymentLoading ? 'Posting...' : 'Post Payment'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         )}
       </div>);
 }

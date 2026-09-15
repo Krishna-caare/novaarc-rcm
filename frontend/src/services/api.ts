@@ -85,6 +85,15 @@ class ApiClient {
     return response.data;
   }
 
+  async getReferenceData(): Promise<{
+    patients: Array<{ patient_id: number; mrn: string; payer_id?: number }>;
+    providers: Array<{ provider_id: number; name: string; specialty?: string }>;
+    payers: Array<{ payer_id: number; name: string }>;
+  }> {
+    const response = await this.client.get('/claims/reference-data');
+    return response.data;
+  }
+
   async getClaim(claimId: number) {
     const response = await this.client.get(`/claims/${claimId}`);
     return response.data;

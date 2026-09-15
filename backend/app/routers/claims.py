@@ -84,6 +84,21 @@ async def list_claims(
     return result.scalars().all()
 
 
+@router.get("/reference-data")
+async def get_reference_data(
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    patients_res = await db.execute(select(Patient).order_by(Patient.patient_id).limit(100))
+    providers_res = await db.execute(select(Provider).order_by(Provider.name).limit(100))
+    payers_res = await db.execute(select(Payer).order_by(Payer.name).limit(100))
+    return {
+        "patients": [{"patient_id": p.patient_id, "mrn": p.mrn, "payer_id": p.payer_id} for p in patients_res.scalars().all()],
+        "providers": [{"provider_id": pr.provider_id, "name": pr.name, "specialty": pr.specialty} for pr in providers_res.scalars().all()],
+        "payers": [{"payer_id": py.payer_id, "name": py.name} for py in payers_res.scalars().all()]
+    }
+
+
 @router.get("/{claim_id}", response_model=ClaimDetail)
 async def get_claim(
     claim_id: int,
@@ -121,7 +136,15 @@ async def create_claim(
 
     await assign_claim_to_queue(db, claim.claim_id)
 
-    return claim
+    # Reload with relationships for full response serialization
+    res = await db.execute(
+        select(ClaimModel).options(
+            selectinload(ClaimModel.patient),
+            selectinload(ClaimModel.provider),
+            selectinload(ClaimModel.payer)
+        ).where(ClaimModel.claim_id == claim.claim_id)
+    )
+    return res.scalar_one()
 
 
 @router.patch("/{claim_id}", response_model=ClaimSchema)
