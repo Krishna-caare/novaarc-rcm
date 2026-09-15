@@ -162,7 +162,16 @@ async def update_claim(
 
     update_data = claim_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
+        if field == "status" and value is not None:
+            if isinstance(value, str):
+                try:
+                    value = ClaimStatus(value)
+                except ValueError:
+                    pass
         setattr(claim, field, value)
+
+    if claim.status == ClaimStatus.paid and (claim.paid_amount is None or claim.paid_amount == 0):
+        claim.paid_amount = claim.charge_amount
 
     await db.commit()
 

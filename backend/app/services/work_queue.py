@@ -10,14 +10,15 @@ async def assign_claim_to_queue(db: AsyncSession, claim_id: int) -> ClaimQueueAs
     if not claim:
         raise ValueError(f"Claim {claim_id} not found")
 
-    existing = await db.execute(
+    existing_res = await db.execute(
         select(ClaimQueueAssignment).where(
             ClaimQueueAssignment.claim_id == claim_id,
             ClaimQueueAssignment.resolved_at.is_(None)
         )
     )
-    if existing.scalar_one_or_none():
-        return existing.scalar_one()
+    existing = existing_res.scalar_one_or_none()
+    if existing:
+        return existing
 
     queue = await determine_queue(db, claim)
     if not queue:
@@ -49,11 +50,18 @@ async def determine_queue(db: AsyncSession, claim: Claim) -> WorkQueue | None:
         return await get_queue_by_name(db, "Denials - Work")
 
     if claim.status in [ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process]:
-        days_outstanding = (await db.execute(select(func.julianday(func.date('now')) - func.julianday(claim.date_of_service)))).scalar()
-        if days_outstanding and days_outstanding > 60:
-            return await get_queue_by_name(db, "Aging - 60+ Days")
-        elif days_outstanding and days_outstanding > 30:
-            return await get_queue_by_name(db, "Aging - 30-60 Days")
+        try:
+            today = date.today()
+            if claim.date_of_service:
+                days_outstanding = (today - claim.date_of_service).days
+            else:
+                days_outstanding = 0
+            if days_outstanding > 60:
+                return await get_queue_by_name(db, "Aging - 60+ Days")
+            elif days_outstanding > 30:
+                return await get_queue_by_name(db, "Aging - 30-60 Days")
+        except Exception:
+            pass
 
     return await get_queue_by_name(db, "New Claims - Review")
 

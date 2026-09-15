@@ -58,7 +58,20 @@ app.include_router(work_queues.router, prefix="/work-queues", tags=["Work Queues
 app.include_router(agents.router, prefix="/agents", tags=["Agents"])
 app.include_router(assistant.router, prefix="/assistant", tags=["AI Assistant"])
 
+from fastapi import Request
+from fastapi.responses import JSONResponse
+import traceback
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    tb = traceback.format_exc()
+    print(f"Unhandled exception on {request.method} {request.url.path}: {exc}\n{tb}")
+    return JSONResponse(
+        status_code=500,
+        content={"detail": str(exc), "traceback": tb}
+    )
+
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "novaarc-rcm"}
+    return {"status": "healthy", "service": "novaarc-rcm", "version": "1.0.2"}
