@@ -193,10 +193,16 @@ def run_tests():
     # 10. Frontend Bundle Check
     print("\n[TEST 10] Frontend Bundle & API URL Check")
     try:
-        r = requests.get(f"{FRONTEND_URL}/assets/index-CaNJ1DkJ.js", timeout=15)
-        assert r.status_code == 200, f"Status {r.status_code}"
-        assert BASE_URL in r.text, "Backend URL not baked into bundle"
-        print("  [PASS] Frontend bundle contains production backend URL")
+        r_html = requests.get(FRONTEND_URL, timeout=15)
+        assert r_html.status_code == 200, f"HTML Status {r_html.status_code}"
+        import re
+        match = re.search(r'src="(/assets/index-[^"]+\.js)"', r_html.text)
+        assert match, "Could not find index-*.js in index.html"
+        js_path = match.group(1)
+        r_js = requests.get(f"{FRONTEND_URL}{js_path}", timeout=15)
+        assert r_js.status_code == 200, f"JS Status {r_js.status_code}"
+        assert BASE_URL in r_js.text, "Backend URL not baked into bundle"
+        print(f"  [PASS] Frontend bundle ({js_path}) contains production backend URL")
         passed += 1
     except Exception as e:
         print(f"  [FAIL] Frontend bundle check failed: {e}")
