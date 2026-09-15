@@ -28,15 +28,22 @@ async def coding_assist(
 ):
     result = await suggest_codes(request.clinical_notes, request.patient_context)
 
-    agent_run = await log_agent_run(
-        db=db,
-        claim_id=request.patient_context.get("claim_id", 0) if request.patient_context else 0,
-        agent_type="coding_assist",
-        input_payload={"clinical_notes": request.clinical_notes, "patient_context": request.patient_context},
-        output_payload=result,
-        confidence=Decimal(str(result.get("overall_confidence", 0.5))),
-        hitl_required=result.get("hitl_required", True)
-    )
+    claim_id = request.patient_context.get("claim_id") if request.patient_context else None
+    if claim_id:
+        try:
+            claim_check = await db.execute(select(ClaimModel.claim_id).where(ClaimModel.claim_id == claim_id))
+            if claim_check.scalar_one_or_none():
+                await log_agent_run(
+                    db=db,
+                    claim_id=claim_id,
+                    agent_type="coding_assist",
+                    input_payload={"clinical_notes": request.clinical_notes, "patient_context": request.patient_context},
+                    output_payload=result,
+                    confidence=Decimal(str(result.get("overall_confidence", 0.5))),
+                    hitl_required=result.get("hitl_required", True)
+                )
+        except Exception:
+            pass
 
     return CodingAssistResponse(
         icd10_suggestions=result.get("icd10_suggestions", []),
