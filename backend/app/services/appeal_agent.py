@@ -9,7 +9,8 @@ from app.core.config import settings
 
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
-MODEL = "nvidia/nemotron-3.5-lightning:free"
+PRIMARY_MODEL = os.getenv("APPEAL_MODEL", "inclusionai/ling-3.0-flash-sante:free")
+FALLBACK_MODEL = "nvidia/nemotron-3.5-lightning:free"
 
 
 APPEAL_DRAFT_PROMPT = """You are a healthcare revenue cycle specialist writing appeal letters for denied claims.
@@ -31,34 +32,49 @@ Return JSON only with this structure:
 }"""
 
 
+def parse_json_safely(text: str) -> dict:
+    import re
+    text = text.strip()
+    match = re.search(r"```(?:json)?\s*([\s\S]*?)\s*```", text)
+    if match:
+        text = match.group(1).strip()
+    return json.loads(text)
+
+
+def get_openrouter_key() -> str:
+    return os.getenv("OPENROUTER_API_KEY", "") or getattr(settings, "OPENROUTER_API_KEY", "")
+
+
 async def call_openrouter(messages: list[dict], temperature: float = 0.4) -> dict:
-    if not OPENROUTER_API_KEY:
+    key = get_openrouter_key()
+    if not key:
         return {"error": "OpenRouter API key not configured"}
 
-    try:
-        async with httpx.AsyncClient(timeout=60.0) as client:
-            response = await client.post(
-                f"{OPENROUTER_BASE_URL}/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_API_KEY}",
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://novaarc.local",
-                    "X-Title": "NovaArc RCM"
-                },
-                json={
-                    "model": MODEL,
-                    "messages": messages,
-                    "temperature": temperature,
-                    "response_format": {"type": "json_object"},
-                    "reasoning": {"enabled": True}
-                }
-            )
-            response.raise_for_status()
-            data = response.json()
-            content = data["choices"][0]["message"]["content"]
-            return json.loads(content)
-    except Exception as e:
-        return {"error": str(e)}
+    for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
+        try:
+            async with httpx.AsyncClient(timeout=45.0) as client:
+                response = await client.post(
+                    f"{OPENROUTER_BASE_URL}/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {key}",
+                        "Content-Type": "application/json",
+                        "HTTP-Referer": "https://novaarc.netlify.app",
+                        "X-Title": "NovaArc RCM"
+                    },
+                    json={
+                        "model": model,
+                        "messages": messages,
+                        "temperature": temperature,
+                    }
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    content = data["choices"][0]["message"]["content"]
+                    return parse_json_safely(content)
+        except Exception:
+            continue
+
+    return {"error": "All OpenRouter models failed or timed out"}
 
 
 async def draft_appeal_letter(denial: Denial, additional_context: str = None) -> tuple[str, Decimal, bool]:

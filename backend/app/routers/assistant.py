@@ -47,6 +47,102 @@ def match_intent(query: str) -> str:
     return "unknown"
 
 
+import os
+import re
+import httpx
+from sqlalchemy import text
+
+NL_SQL_MODELS = [
+    os.getenv("ANALYTICS_MODEL", "poolside/laguna-s-2.1:free"),
+    "nex-agi/nex-n2.5-mini:free",
+    "nvidia/nemotron-3.5-lightning:free"
+]
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+
+SCHEMA_DESCRIPTION = """PostgreSQL Tables:
+- claims (claim_id, patient_id, provider_id, payer_id, date_of_service, charge_amount, paid_amount, status)
+- payers (payer_id, name, payer_type)
+- providers (provider_id, name, specialty)
+- patients (patient_id, mrn, dob)
+- denials (denial_id, claim_id, denial_code, description, denied_amount, denial_date, root_cause)
+- payments (payment_id, claim_id, amount, posted_date, remittance_ref, payer_id)
+"""
+
+
+async def handle_nl_analytics(query: str, db: AsyncSession) -> AssistantQueryResponse:
+    openrouter_key = os.getenv("OPENROUTER_API_KEY", "")
+    if openrouter_key:
+        prompt = f"""You are an expert RCM Analytics assistant for a healthcare organization.
+Database Schema:
+{SCHEMA_DESCRIPTION}
+
+Question: "{query}"
+
+If the question can be answered by querying the database, write a single valid read-only PostgreSQL SELECT query inside a ```sql ... ``` block.
+Do NOT write any INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE queries.
+If no SQL is needed, provide a concise analytical answer."""
+
+        for model in NL_SQL_MODELS:
+            try:
+                async with httpx.AsyncClient(timeout=25.0) as client:
+                    resp = await client.post(
+                        f"{OPENROUTER_BASE_URL}/chat/completions",
+                        headers={
+                            "Authorization": f"Bearer {openrouter_key}",
+                            "Content-Type": "application/json",
+                            "HTTP-Referer": "https://novaarc.netlify.app",
+                            "X-Title": "NovaArc RCM"
+                        },
+                        json={
+                            "model": model,
+                            "messages": [{"role": "user", "content": prompt}],
+                            "temperature": 0.1
+                        }
+                    )
+                    if resp.status_code == 200:
+                        content = resp.json()["choices"][0]["message"]["content"]
+                        sql_match = re.search(r"```(?:sql)?\s*(SELECT[\s\S]*?)\s*```", content, re.IGNORECASE)
+                        if sql_match:
+                            sql = sql_match.group(1).strip()
+                            if sql.upper().startswith("SELECT") and not any(kw in sql.upper() for kw in ["DROP ", "DELETE ", "INSERT ", "UPDATE ", "ALTER ", "TRUNCATE "]):
+                                sql_res = await db.execute(text(sql))
+                                rows = sql_res.fetchall()
+                                return AssistantQueryResponse(
+                                    intent="nl_to_sql",
+                                    response=f"Analytics query result ({len(rows)} records found):\n" + "\n".join(str(dict(r._mapping)) for r in rows[:5]),
+                                    data={"sql": sql, "rows": [dict(r._mapping) for r in rows[:10]]},
+                                    follow_up_suggestions=[
+                                        "What's our AR over 90 days?",
+                                        "Show me top denial codes",
+                                        "What's the denial rate by payer?"
+                                    ]
+                                )
+                        else:
+                            return AssistantQueryResponse(
+                                intent="nl_analytics",
+                                response=content,
+                                follow_up_suggestions=[
+                                    "What's our AR over 90 days?",
+                                    "Show me top denial codes",
+                                    "Show me collection rate"
+                                ]
+                            )
+            except Exception:
+                continue
+
+    return AssistantQueryResponse(
+        intent="unknown",
+        response="I can help you with queries about AR aging, denial rates, top denial codes, payer comparison, collection rates, total AR, and claims by status. Try asking: 'What's our AR over 90 days?' or 'Show me top denial codes'",
+        follow_up_suggestions=[
+            "What's our AR over 90 days?",
+            "Show me top denial codes",
+            "What's the denial rate by payer?",
+            "Show me collection rate"
+        ]
+    )
+
+
 @router.post("/query", response_model=AssistantQueryResponse)
 async def assistant_query(
     request: AssistantQueryRequest,
@@ -70,16 +166,7 @@ async def assistant_query(
     elif intent == "claims_by_status":
         return await handle_claims_by_status(db)
     else:
-        return AssistantQueryResponse(
-            intent="unknown",
-            response="I can help you with queries about AR aging, denial rates, top denial codes, payer comparison, collection rates, total AR, and claims by status. Try asking: 'What's our AR over 90 days?' or 'Show me top denial codes'",
-            follow_up_suggestions=[
-                "What's our AR over 90 days?",
-                "Show me top denial codes",
-                "What's the denial rate by payer?",
-                "Show me collection rate"
-            ]
-        )
+        return await handle_nl_analytics(request.query, db)
 
 
 async def handle_ar_over_90(db: AsyncSession) -> AssistantQueryResponse:
