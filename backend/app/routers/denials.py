@@ -128,6 +128,7 @@ async def get_denial(
 
 
 @router.patch("/{denial_id}", response_model=DenialSchema)
+@router.put("/{denial_id}", response_model=DenialSchema)
 async def update_denial(
     denial_id: int,
     denial_data: DenialUpdate,

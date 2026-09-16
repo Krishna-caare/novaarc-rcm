@@ -150,6 +150,7 @@ async def create_claim(
 
 
 @router.patch("/{claim_id}", response_model=ClaimSchema)
+@router.put("/{claim_id}", response_model=ClaimSchema)
 async def update_claim(
     claim_id: int,
     claim_data: ClaimUpdate,
