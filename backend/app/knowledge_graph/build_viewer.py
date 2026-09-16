@@ -11,18 +11,19 @@ def build_viewer():
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NovaArc RCM — Denial Knowledge Graph Cluster Explorer</title>
+  <title>NovaArc RCM — Denial Knowledge Graph (Obsidian Engine)</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: #12141a;
-      color: #f1f5f9;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background-color: #000000;
+      color: #e5e7eb;
+      font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       overflow: hidden;
       width: 100vw;
       height: 100vh;
       display: flex;
       user-select: none;
+      -webkit-font-smoothing: antialiased;
     }
 
     #canvas-container {
@@ -30,7 +31,7 @@ def build_viewer():
       position: relative;
       height: 100%;
       min-width: 0;
-      background-color: #12141a;
+      background-color: #000000;
       overflow: hidden;
     }
 
@@ -42,14 +43,14 @@ def build_viewer():
     }
     canvas:active { cursor: grabbing; }
 
-    /* Top Floating Header & Filter Controls */
+    /* Top Floating Header & Filter Controls - Obsidian Minimalist Style */
     .top-bar {
       position: absolute;
-      top: 16px;
-      left: 20px;
-      right: 20px;
+      top: 14px;
+      left: 16px;
+      right: 16px;
       display: flex;
-      gap: 12px;
+      gap: 10px;
       align-items: center;
       z-index: 10;
       pointer-events: none;
@@ -57,22 +58,22 @@ def build_viewer():
     .top-bar > * { pointer-events: auto; }
 
     .brand-pill {
-      background: #1a1e29;
-      border: 1px solid #2e384d;
-      padding: 8px 18px;
-      border-radius: 9999px;
-      font-size: 13px;
-      font-weight: 700;
-      color: #e2e8f0;
+      background: rgba(18, 19, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 7px 16px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #f3f4f6;
       display: flex;
       align-items: center;
-      gap: 10px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      gap: 8px;
+      backdrop-filter: blur(12px);
       letter-spacing: 0.01em;
     }
     .brand-pill .dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background: #3b82f6;
     }
@@ -80,32 +81,35 @@ def build_viewer():
     .search-wrapper {
       position: relative;
       flex: 1;
-      max-width: 380px;
+      max-width: 320px;
     }
     .search-input {
       width: 100%;
-      background: #1a1e29;
-      border: 1px solid #2e384d;
-      padding: 9px 18px 9px 38px;
-      border-radius: 9999px;
-      color: #fff;
-      font-size: 13px;
+      background: rgba(18, 19, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 7px 14px 7px 32px;
+      border-radius: 6px;
+      color: #f3f4f6;
+      font-size: 12px;
       outline: none;
-      transition: border-color 0.2s, box-shadow 0.2s;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(12px);
+      transition: border-color 0.15s;
+    }
+    .search-input::placeholder {
+      color: #6b7280;
     }
     .search-input:focus {
-      border-color: #3b82f6;
-      box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
-      background: #202634;
+      border-color: rgba(255, 255, 255, 0.28);
+      background: rgba(24, 26, 32, 0.95);
     }
     .search-icon {
       position: absolute;
-      left: 14px;
+      left: 10px;
       top: 50%;
       transform: translateY(-50%);
-      color: #94a3b8;
-      font-size: 13px;
+      width: 13px;
+      height: 13px;
+      stroke: #6b7280;
       pointer-events: none;
     }
 
@@ -113,78 +117,84 @@ def build_viewer():
       display: flex;
       gap: 6px;
       flex-wrap: wrap;
+      align-items: center;
     }
     .cat-chip {
-      background: #1a1e29;
-      border: 1px solid #2e384d;
-      padding: 6px 12px;
-      border-radius: 9999px;
+      background: rgba(18, 19, 24, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 5px 11px;
+      border-radius: 5px;
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
+      color: #9ca3af;
+      cursor: pointer;
       display: flex;
       align-items: center;
       gap: 6px;
-      cursor: pointer;
-      color: #cbd5e1;
+      backdrop-filter: blur(10px);
       transition: all 0.15s ease;
     }
-    .cat-chip:hover, .cat-chip.active {
-      border-color: #94a3b8;
-      color: #fff;
-      background: #252c3c;
-      transform: translateY(-1px);
-    }
     .cat-chip .dot {
-      width: 8px;
-      height: 8px;
+      width: 5px;
+      height: 5px;
       border-radius: 50%;
     }
+    .cat-chip:hover {
+      background: rgba(30, 33, 42, 0.9);
+      border-color: rgba(255, 255, 255, 0.2);
+      color: #f3f4f6;
+    }
+    .cat-chip.active {
+      background: rgba(45, 50, 64, 0.95);
+      border-color: rgba(255, 255, 255, 0.3);
+      color: #ffffff;
+    }
 
-    /* Floating Center Stats */
-    .cluster-stats-hud {
+    /* Bottom Toolbar */
+    .bottom-bar {
       position: absolute;
-      bottom: 20px;
-      left: 20px;
+      bottom: 16px;
+      left: 16px;
       display: flex;
       gap: 8px;
       align-items: center;
       z-index: 10;
     }
     .ctrl-btn {
-      background: #1a1e29;
-      border: 1px solid #2e384d;
-      padding: 7px 13px;
-      border-radius: 6px;
+      background: rgba(18, 19, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      padding: 6px 12px;
+      border-radius: 5px;
       color: #cbd5e1;
-      font-size: 12px;
-      font-weight: 600;
+      font-size: 11px;
+      font-weight: 500;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 6px;
+      backdrop-filter: blur(10px);
       transition: all 0.15s;
-      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
     .ctrl-btn:hover {
-      background: #242c3d;
-      border-color: #64748b;
+      background: rgba(32, 35, 45, 0.95);
+      border-color: rgba(255, 255, 255, 0.2);
       color: #fff;
     }
     .ctrl-btn.active {
-      background: #1e3a8a;
-      border-color: #3b82f6;
-      color: #93c5fd;
+      background: rgba(45, 50, 65, 0.95);
+      border-color: rgba(255, 255, 255, 0.35);
+      color: #fff;
     }
 
     .stats-tag {
-      background: rgba(18, 20, 26, 0.85);
-      border: 1px solid #2e384d;
+      background: rgba(18, 19, 24, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.08);
       padding: 6px 12px;
-      border-radius: 6px;
+      border-radius: 5px;
       font-size: 11px;
-      color: #94a3b8;
-      font-weight: 600;
-      letter-spacing: 0.02em;
+      color: #6b7280;
+      font-weight: 500;
+      backdrop-filter: blur(10px);
     }
 
     /* Floating Tooltip */
@@ -192,164 +202,174 @@ def build_viewer():
       position: absolute;
       display: none;
       pointer-events: none;
-      background: #1a1e29;
-      border: 1px solid #3b4252;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+      background: rgba(14, 15, 19, 0.95);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
       padding: 8px 12px;
-      border-radius: 6px;
+      border-radius: 5px;
       font-size: 12px;
       color: #fff;
       z-index: 25;
       transform: translate(-50%, -130%);
       white-space: nowrap;
+      backdrop-filter: blur(12px);
     }
     #node-tooltip .tt-type {
       font-size: 10px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      font-weight: 700;
+      font-weight: 600;
+      color: #9ca3af;
       margin-bottom: 2px;
     }
     #node-tooltip .tt-title {
       font-weight: 600;
-      font-size: 13px;
+      font-size: 12px;
+      color: #f3f4f6;
     }
 
-    /* Detail Inspector Sidebar */
+    /* Detail Inspector Sidebar - Obsidian Minimalist Style */
     .sidebar {
-      width: 440px;
+      width: 420px;
       height: 100%;
-      background: #161a24;
-      border-left: 1px solid #252d3d;
-      padding: 24px;
+      background: rgba(10, 11, 15, 0.96);
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 22px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
-      gap: 18px;
-      box-shadow: -10px 0 25px rgba(0, 0, 0, 0.5);
+      gap: 16px;
       z-index: 20;
       user-select: text;
+      backdrop-filter: blur(16px);
     }
-    .sidebar::-webkit-scrollbar { width: 6px; }
-    .sidebar::-webkit-scrollbar-thumb { background: #2a3447; border-radius: 3px; }
+    .sidebar::-webkit-scrollbar { width: 5px; }
+    .sidebar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
 
     .sidebar-header {
-      border-bottom: 1px solid #252d3d;
-      padding-bottom: 16px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 14px;
     }
     .node-type-badge {
       display: inline-block;
-      padding: 3px 9px;
+      padding: 3px 8px;
       border-radius: 4px;
-      font-size: 11px;
-      font-weight: 700;
+      font-size: 10px;
+      font-weight: 600;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
+      letter-spacing: 0.04em;
+      background: rgba(255, 255, 255, 0.08);
+      color: #d1d5db;
       margin-bottom: 8px;
     }
     .sidebar-title {
-      font-size: 19px;
+      font-size: 17px;
       font-weight: 700;
-      color: #f8fafc;
+      color: #f9fafb;
       line-height: 1.35;
     }
     .sidebar-desc {
-      font-size: 13px;
-      color: #94a3b8;
+      font-size: 12px;
+      color: #9ca3af;
       line-height: 1.5;
-      margin-top: 8px;
+      margin-top: 6px;
     }
 
     .section-card {
-      background: #1b202e;
-      border: 1px solid #283347;
-      border-radius: 8px;
-      padding: 14px;
+      background: rgba(18, 20, 26, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 6px;
+      padding: 13px;
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 8px;
     }
     .section-card h4 {
-      font-size: 12px;
+      font-size: 11px;
       text-transform: uppercase;
-      letter-spacing: 0.05em;
-      color: #93c5fd;
-      font-weight: 700;
+      letter-spacing: 0.04em;
+      color: #d1d5db;
+      font-weight: 600;
       display: flex;
       align-items: center;
       gap: 6px;
     }
     .checklist-item {
-      font-size: 12px;
-      color: #cbd5e1;
+      font-size: 11.5px;
+      color: #9ca3af;
       display: flex;
       gap: 8px;
       line-height: 1.45;
     }
     .checklist-item::before {
       content: "•";
-      color: #60a5fa;
+      color: #d1d5db;
       font-weight: bold;
     }
     .script-item {
-      background: #121620;
-      border-left: 3px solid #f472b6;
-      padding: 8px 12px;
+      background: rgba(12, 13, 17, 0.85);
+      border-left: 2px solid rgba(255, 255, 255, 0.3);
+      padding: 7px 11px;
       border-radius: 0 4px 4px 0;
-      font-size: 12px;
-      color: #f1f5f9;
-      font-style: italic;
+      font-size: 11.5px;
+      color: #e5e7eb;
       line-height: 1.4;
     }
-    .copy-btn {
-      background: #2563eb;
-      color: #fff;
-      border: none;
-      padding: 6px 12px;
-      border-radius: 4px;
-      font-size: 11px;
-      font-weight: 700;
-      cursor: pointer;
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      transition: background 0.15s;
+    .script-item strong {
+      color: #9ca3af;
+      font-size: 10.5px;
+      text-transform: uppercase;
+      margin-right: 4px;
     }
-    .copy-btn:hover { background: #1d4ed8; }
     .notes-box {
-      background: #0f121a;
-      border: 1px solid #252d3d;
-      padding: 12px;
-      border-radius: 6px;
-      font-family: 'Consolas', 'Courier New', monospace;
-      font-size: 11px;
-      color: #cbd5e1;
-      white-space: pre-wrap;
-      max-height: 140px;
-      overflow-y: auto;
-      line-height: 1.45;
-    }
-    .sub-item-link {
+      background: #050608;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 5px;
       padding: 10px;
-      background: #151a24;
-      border: 1px solid #283347;
-      border-radius: 6px;
-      font-size: 12px;
-      cursor: pointer;
-      border-left: 3px solid #3b82f6;
-      transition: background 0.15s, border-color 0.15s, transform 0.15s;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 10.5px;
+      color: #d1d5db;
+      white-space: pre-wrap;
+      line-height: 1.5;
+      max-height: 160px;
+      overflow-y: auto;
     }
-    .sub-item-link:hover {
-      background: #1f2736;
-      border-color: #60a5fa;
-      transform: translateX(3px);
+    .copy-btn {
+      background: rgba(255, 255, 255, 0.08);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 4px 9px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      font-weight: 500;
+      color: #e5e7eb;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .copy-btn:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
     }
     .hint-box {
-      font-size: 12px;
-      color: #64748b;
+      font-size: 11.5px;
+      color: #6b7280;
       text-align: center;
-      margin-top: 20px;
-      line-height: 1.6;
+      padding: 24px 12px;
+      line-height: 1.5;
+    }
+    .sub-item-link {
+      padding: 7px 10px;
+      border-radius: 5px;
+      background: rgba(12, 13, 17, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      font-size: 11.5px;
+      color: #d1d5db;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .sub-item-link:hover {
+      background: rgba(25, 28, 36, 0.85);
+      border-color: rgba(255, 255, 255, 0.15);
+      color: #fff;
     }
   </style>
 </head>
@@ -362,49 +382,40 @@ def build_viewer():
       </div>
 
       <div class="search-wrapper">
-        <span class="search-icon">🔍</span>
-        <input type="text" id="search-box" class="search-input" placeholder="Search CARC, scenario, modifier (e.g. CO-16, CO-216, auth)..." />
+        <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+        <input type="text" class="search-input" id="search-box" placeholder="Search node, code, scenario..." autocomplete="off" />
       </div>
 
-      <div class="category-pills" id="category-pills">
-        <!-- Category chips rendered dynamically -->
-      </div>
-    </div>
-
-    <!-- Bottom Controls -->
-    <div class="cluster-stats-hud">
-      <button class="ctrl-btn" id="btn-reset">🎯 Center Graph</button>
-      <button class="ctrl-btn active" id="btn-labels">🏷️ Labels: ON</button>
-      <div class="stats-tag" id="hud-stats">""" + f"{len(graph_data['nodes'])} NODES • {len(graph_data['links'])} RELATIONS" + """</div>
-    </div>
-
-    <!-- Tooltip -->
-    <div id="node-tooltip">
-      <div class="tt-type" id="tt-type">Scenario</div>
-      <div class="tt-title" id="tt-title">Node Title</div>
+      <div class="category-pills" id="category-pills"></div>
     </div>
 
     <canvas id="graph-canvas"></canvas>
+
+    <div class="bottom-bar">
+      <button class="ctrl-btn" id="btn-reset" title="Reset Camera">↺ Reset View</button>
+      <button class="ctrl-btn active" id="btn-labels" title="Toggle Labels">🏷️ Labels</button>
+      <div class="stats-tag" id="stats-counter">205 nodes · 197 links</div>
+    </div>
+
+    <div id="node-tooltip">
+      <div class="tt-type" id="tt-type"></div>
+      <div class="tt-title" id="tt-title"></div>
+    </div>
   </div>
 
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
-      <div>
-        <div class="node-type-badge" id="badge-type" style="background: #1e3a8a; color: #93c5fd;">EXPLORER</div>
-        <h3 class="sidebar-title" id="node-title">Denial Knowledge Graph</h3>
-      </div>
-    </div>
-    <div class="sidebar-desc" id="node-desc">
-      Click on any category cluster or code node to inspect root-cause scenarios, CMS-1500 box mappings, payer call scripts, and step-by-step resolution playbooks.
+      <span class="node-type-badge" id="badge-type">Category</span>
+      <h2 class="sidebar-title" id="node-title">Missing Information & Documentation</h2>
+      <p class="sidebar-desc" id="node-desc">Claims failing due to absent operative reports, medical records, or unsigned certifications.</p>
     </div>
 
     <div id="dynamic-sections" style="display: flex; flex-direction: column; gap: 14px;">
       <div class="hint-box">
-        ✨ <strong>Interactive Controls:</strong><br/>
-        • <strong>Left Click + Drag:</strong> Pan network view<br/>
-        • <strong>Mouse Wheel:</strong> Zoom in & out<br/>
-        • <strong>Hover Node:</strong> Highlight cluster & connections<br/>
-        • <strong>Click Node:</strong> Lock focus & open resolution playbook
+        Click on any node in the Obsidian constellation to inspect its investigation checklist, CMS-1500 field mapping, and payer script.
       </div>
     </div>
   </div>
@@ -414,92 +425,50 @@ def build_viewer():
 
     const canvas = document.getElementById('graph-canvas');
     const ctx = canvas.getContext('2d');
-
-    let width = 800;
-    let height = 800;
+    let width = 0;
+    let height = 0;
 
     function resizeCanvas() {
       const container = document.getElementById('canvas-container');
       const w = container ? container.clientWidth : 0;
       const h = container ? container.clientHeight : 0;
-      width = canvas.width = Math.max(w || (window.innerWidth - 440), 500);
+      width = canvas.width = Math.max(w || (window.innerWidth - 420), 500);
       height = canvas.height = Math.max(h || window.innerHeight, 500);
     }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Proper Scientific Community Palettes (Harmonious, Non-Neon, Gephi-Style)
+    // Obsidian Muted Tag Accents for Hubs (leaves stay graphite silver)
     const CLUSTER_PALETTES = {
-      'CAT_MISSING_INFO': {
-        primary: '#2563eb',       // Royal Blue
-        light: '#60a5fa',
-        tint: '#93c5fd',
-        line: 'rgba(59, 130, 246, 0.35)'
-      },
-      'CAT_PRIOR_AUTH': {
-        primary: '#059669',       // Deep Mint / Forest Green
-        light: '#34d399',
-        tint: '#6ee7b7',
-        line: 'rgba(16, 185, 129, 0.35)'
-      },
-      'CAT_TIMELY_FILING': {
-        primary: '#dc2626',       // Ruby / Crimson Red
-        light: '#f87171',
-        tint: '#fca5a5',
-        line: 'rgba(239, 68, 68, 0.35)'
-      },
-      'CAT_COB': {
-        primary: '#d97706',       // Amber / Warm Honey
-        light: '#fbbf24',
-        tint: '#fde68a',
-        line: 'rgba(245, 158, 11, 0.35)'
-      },
-      'CAT_MEDICAL_NECESSITY': {
-        primary: '#7c3aed',       // Royal Violet
-        light: '#a78bfa',
-        tint: '#c4b5fd',
-        line: 'rgba(139, 92, 246, 0.35)'
-      },
-      'CAT_CODING_MODIFIERS': {
-        primary: '#0891b2',       // Cerulean / Deep Teal
-        light: '#22d3ee',
-        tint: '#67e8f9',
-        line: 'rgba(6, 182, 212, 0.35)'
-      },
-      'CAT_DUPLICATE_BUNDLING': {
-        primary: '#db2777',       // Deep Rose / Mulberry
-        light: '#f472b6',
-        tint: '#fbcfe8',
-        line: 'rgba(236, 72, 153, 0.35)'
-      },
-      'CAT_ELIGIBILITY': {
-        primary: '#4f46e5',       // Deep Indigo
-        light: '#818cf8',
-        tint: '#a5b4fc',
-        line: 'rgba(99, 102, 241, 0.35)'
-      }
+      'CAT_MISSING_INFO':       { accent: '#3b82f6', name: 'Missing Info' },
+      'CAT_PRIOR_AUTH':          { accent: '#10b981', name: 'Prior Auth' },
+      'CAT_TIMELY_FILING':       { accent: '#f43f5e', name: 'Timely Filing' },
+      'CAT_COB':                 { accent: '#f59e0b', name: 'COB' },
+      'CAT_MEDICAL_NECESSITY':   { accent: '#8b5cf6', name: 'Med Necessity' },
+      'CAT_CODING_MODIFIERS':    { accent: '#0ea5e9', name: 'Coding & Mod' },
+      'CAT_DUPLICATE_BUNDLING':  { accent: '#ec4899', name: 'Bundling' },
+      'CAT_ELIGIBILITY':         { accent: '#6366f1', name: 'Eligibility' }
     };
 
-    // Category cluster center coordinates (8 well-separated orbital anchor points)
     const CLUSTER_CENTERS = {
-      'CAT_MISSING_INFO':       { angle: 0,                   dist: 280 },
-      'CAT_PRIOR_AUTH':          { angle: Math.PI * 0.25,      dist: 280 },
-      'CAT_TIMELY_FILING':       { angle: Math.PI * 0.5,       dist: 280 },
-      'CAT_COB':                 { angle: Math.PI * 0.75,      dist: 280 },
-      'CAT_MEDICAL_NECESSITY':   { angle: Math.PI,             dist: 280 },
-      'CAT_CODING_MODIFIERS':    { angle: Math.PI * 1.25,      dist: 280 },
-      'CAT_DUPLICATE_BUNDLING':  { angle: Math.PI * 1.5,       dist: 280 },
-      'CAT_ELIGIBILITY':         { angle: Math.PI * 1.75,      dist: 280 }
+      'CAT_MISSING_INFO':       { angle: 0,                   dist: 260 },
+      'CAT_PRIOR_AUTH':          { angle: Math.PI * 0.25,      dist: 260 },
+      'CAT_TIMELY_FILING':       { angle: Math.PI * 0.5,       dist: 260 },
+      'CAT_COB':                 { angle: Math.PI * 0.75,      dist: 260 },
+      'CAT_MEDICAL_NECESSITY':   { angle: Math.PI,             dist: 260 },
+      'CAT_CODING_MODIFIERS':    { angle: Math.PI * 1.25,      dist: 260 },
+      'CAT_DUPLICATE_BUNDLING':  { angle: Math.PI * 1.5,       dist: 260 },
+      'CAT_ELIGIBILITY':         { angle: Math.PI * 1.75,      dist: 260 }
     };
 
-    // Build category chips in header
+    // Category Filter Chips
     const catContainer = document.getElementById('category-pills');
     if (graphData.categories) {
       graphData.categories.forEach(function(cat) {
-        const pal = CLUSTER_PALETTES[cat.id] || { primary: '#3b82f6' };
+        const pal = CLUSTER_PALETTES[cat.id] || { accent: '#9ca3af' };
         const chip = document.createElement('div');
         chip.className = 'cat-chip';
-        chip.innerHTML = '<span class="dot" style="background:' + pal.primary + '"></span>' + cat.name.split(' ')[0];
+        chip.innerHTML = '<span class="dot" style="background:' + pal.accent + '"></span>' + (pal.name || cat.name.split(' ')[0]);
         chip.title = cat.name;
         chip.addEventListener('click', function() {
           selectCategory(cat.id);
@@ -508,22 +477,20 @@ def build_viewer():
       });
     }
 
-    // Helper to determine node's category ID
     function getNodeCategoryId(node) {
       if (node.type === 'category') return node.id;
       if (node.properties && node.properties.category_id) return node.properties.category_id;
       return null;
     }
 
-    // Initialize Nodes with Community Cluster Layout
+    // Initialize Nodes with Obsidian Design Hierarchy
     const nodes = graphData.nodes.map(function(n) {
       let catId = getNodeCategoryId(n);
       return Object.assign({}, n, {
         categoryId: catId,
         x: 0, y: 0, vx: 0, vy: 0,
-        radius: (n.type === 'category' ? 14 : (n.type === 'denial_code' ? 9 : (n.type === 'scenario' ? 6.5 : 4.5))),
-        color: '#94a3b8',
-        lineColor: 'rgba(148, 163, 184, 0.25)'
+        radius: (n.type === 'category' ? 10 : (n.type === 'denial_code' ? 6 : 3.2)),
+        color: '#848a98'
       });
     });
 
@@ -537,35 +504,40 @@ def build_viewer():
       });
     }).filter(function(l) { return l.sourceNode && l.targetNode; });
 
-    // Propagate category ID down to child scenarios and leaves
+    // Propagate category ID to child nodes
     links.forEach(function(l) {
       if (l.sourceNode.categoryId && !l.targetNode.categoryId) {
         l.targetNode.categoryId = l.sourceNode.categoryId;
       }
     });
-    // Second pass for leaves
     links.forEach(function(l) {
       if (l.sourceNode.categoryId && !l.targetNode.categoryId) {
         l.targetNode.categoryId = l.sourceNode.categoryId;
       }
     });
 
-    // Assign Proper Non-Neon Palette Colors to all Nodes & Edges based on their cluster
+    // Obsidian Palette Assignment:
+    // Only Category hubs and CARC code hubs have color accents; leaves are graphite silver
     nodes.forEach(function(n, i) {
-      const pal = CLUSTER_PALETTES[n.categoryId] || { primary: '#2563eb', light: '#60a5fa', tint: '#93c5fd', line: 'rgba(59,130,246,0.3)' };
+      const pal = CLUSTER_PALETTES[n.categoryId] || { accent: '#9ca3af' };
       if (n.type === 'category') {
-        n.color = pal.primary;
+        n.color = pal.accent;
+        n.radius = 9.5;
       } else if (n.type === 'denial_code') {
-        n.color = pal.light;
+        n.color = pal.accent;
+        n.radius = 5.8;
       } else if (n.type === 'scenario') {
-        n.color = pal.tint;
+        // Soft muted graphite with slight hint
+        n.color = '#949ba8';
+        n.radius = 3.6;
       } else {
-        n.color = pal.light;
+        // Child checklists, form boxes, scripts: pure Obsidian graphite stars
+        n.color = '#6b7280';
+        n.radius = 2.4;
       }
-      n.lineColor = pal.line;
 
-      // Position nodes in their cluster neighborhood
-      const cluster = CLUSTER_CENTERS[n.categoryId] || { angle: (i / nodes.length) * Math.PI * 2, dist: 250 };
+      // Initial orbital position
+      const cluster = CLUSTER_CENTERS[n.categoryId] || { angle: (i / nodes.length) * Math.PI * 2, dist: 240 };
       const cx = Math.cos(cluster.angle) * cluster.dist;
       const cy = Math.sin(cluster.angle) * cluster.dist;
 
@@ -574,25 +546,20 @@ def build_viewer():
         n.y = cy;
       } else if (n.type === 'denial_code') {
         const offsetAngle = Math.random() * Math.PI * 2;
-        const offsetDist = 50 + Math.random() * 60;
+        const offsetDist = 40 + Math.random() * 55;
         n.x = cx + Math.cos(offsetAngle) * offsetDist;
         n.y = cy + Math.sin(offsetAngle) * offsetDist;
       } else {
         const offsetAngle = Math.random() * Math.PI * 2;
-        const offsetDist = 90 + Math.random() * 85;
+        const offsetDist = 70 + Math.random() * 80;
         n.x = cx + Math.cos(offsetAngle) * offsetDist;
         n.y = cy + Math.sin(offsetAngle) * offsetDist;
       }
     });
 
-    // Assign line colors based on source cluster
-    links.forEach(function(l) {
-      l.color = l.sourceNode.lineColor || 'rgba(148, 163, 184, 0.25)';
-    });
-
-    // Run Force Relaxation to create organic community clusters
-    for (let step = 0; step < 90; step++) {
-      // Repulsion between all nodes
+    // Organic Force Relaxation for Constellation Density
+    for (let step = 0; step < 110; step++) {
+      // Repulsion
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
           const a = nodes[i];
@@ -600,9 +567,9 @@ def build_viewer():
           let dx = b.x - a.x;
           let dy = b.y - a.y;
           let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const minDist = (a.radius + b.radius) * 4.0;
+          const minDist = (a.radius + b.radius) * 3.8;
           if (dist < minDist) {
-            const force = (minDist - dist) / dist * 0.25;
+            const force = (minDist - dist) / dist * 0.28;
             const fx = dx * force;
             const fy = dy * force;
             if (a.type !== 'category') { a.vx -= fx; a.vy -= fy; }
@@ -611,40 +578,40 @@ def build_viewer():
         }
       }
 
-      // Spring attraction along links
+      // Link spring
       links.forEach(function(l) {
         const a = l.sourceNode;
         const b = l.targetNode;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const targetDist = 35 + (a.radius + b.radius);
-        const force = (dist - targetDist) * 0.035;
+        const targetDist = 28 + (a.radius + b.radius);
+        const force = (dist - targetDist) * 0.04;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
         if (a.type !== 'category') { a.vx += fx; a.vy += fy; }
-        if (b.type !== 'category') { b.vx -= fx; b.vy -= fy; }
+        if (b.type !== 'category') { b.vx += fx; b.vy += fy; }
       });
 
-      // Gravity toward cluster center
+      // Gravity toward cluster anchor
       nodes.forEach(function(n) {
         if (n.type === 'category') return;
         const cluster = CLUSTER_CENTERS[n.categoryId];
         if (cluster) {
           const cx = Math.cos(cluster.angle) * cluster.dist;
           const cy = Math.sin(cluster.angle) * cluster.dist;
-          n.vx += (cx - n.x) * 0.008;
-          n.vy += (cy - n.y) * 0.008;
+          n.vx += (cx - n.x) * 0.009;
+          n.vy += (cy - n.y) * 0.009;
         }
         n.x += n.vx;
         n.y += n.vy;
-        n.vx *= 0.75;
-        n.vy *= 0.75;
+        n.vx *= 0.72;
+        n.vy *= 0.72;
       });
     }
 
-    // Pan & Zoom Camera State
-    let transform = { x: 0, y: 0, scale: 0.95 };
+    // Camera State
+    let transform = { x: 0, y: 0, scale: 1.0 };
     let isDragging = false;
     let draggedNode = null;
     let startPan = { x: 0, y: 0 };
@@ -652,8 +619,6 @@ def build_viewer():
     let selectedNode = null;
     let filterQuery = '';
     let showLabels = true;
-
-    // Smooth camera target
     let targetTransform = null;
 
     canvas.addEventListener('mousedown', function(e) {
@@ -661,12 +626,11 @@ def build_viewer():
       const mouseX = (e.clientX - rect.left - width / 2 - transform.x) / transform.scale;
       const mouseY = (e.clientY - rect.top - height / 2 - transform.y) / transform.scale;
 
-      // Check click on node
       for (let i = nodes.length - 1; i >= 0; i--) {
         const n = nodes[i];
         const dx = mouseX - n.x;
         const dy = mouseY - n.y;
-        const hitR = Math.max(n.radius * 1.6, 10);
+        const hitR = Math.max(n.radius * 1.8, 10);
         if (dx * dx + dy * dy < hitR * hitR) {
           draggedNode = n;
           selectNode(n);
@@ -694,13 +658,12 @@ def build_viewer():
         transform.x = e.clientX - startPan.x;
         transform.y = e.clientY - startPan.y;
       } else {
-        // Hover detection
         let found = null;
         for (let i = nodes.length - 1; i >= 0; i--) {
           const n = nodes[i];
           const dx = mouseX - n.x;
           const dy = mouseY - n.y;
-          const hitR = Math.max(n.radius * 1.5, 9);
+          const hitR = Math.max(n.radius * 1.6, 9);
           if (dx * dx + dy * dy < hitR * hitR) {
             found = n;
             break;
@@ -721,7 +684,7 @@ def build_viewer():
     canvas.addEventListener('wheel', function(e) {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      transform.scale = Math.max(0.35, Math.min(3.2, transform.scale * zoomFactor));
+      transform.scale = Math.max(0.35, Math.min(3.5, transform.scale * zoomFactor));
     });
 
     const tooltipEl = document.getElementById('node-tooltip');
@@ -741,14 +704,14 @@ def build_viewer():
       tooltipEl.style.display = 'block';
     }
 
-    // Render Loop
+    // Obsidian Render Loop
     function draw() {
       if (targetTransform) {
-        transform.x += (targetTransform.x - transform.x) * 0.1;
-        transform.y += (targetTransform.y - transform.y) * 0.1;
-        transform.scale += (targetTransform.scale - transform.scale) * 0.1;
-        if (Math.abs(targetTransform.x - transform.x) < 0.5 &&
-            Math.abs(targetTransform.y - transform.y) < 0.5 &&
+        transform.x += (targetTransform.x - transform.x) * 0.12;
+        transform.y += (targetTransform.y - transform.y) * 0.12;
+        transform.scale += (targetTransform.scale - transform.scale) * 0.12;
+        if (Math.abs(targetTransform.x - transform.x) < 0.4 &&
+            Math.abs(targetTransform.y - transform.y) < 0.4 &&
             Math.abs(targetTransform.scale - transform.scale) < 0.005) {
           targetTransform = null;
         }
@@ -762,7 +725,7 @@ def build_viewer():
 
       const activeFocus = selectedNode || hoveredNode;
 
-      // 1. Draw Links (Matching their source cluster community color)
+      // 1. Draw Links (Obsidian Delicate Filaments)
       links.forEach(function(l) {
         const a = l.sourceNode;
         const b = l.targetNode;
@@ -776,22 +739,22 @@ def build_viewer():
 
         if (isConnected) {
           ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2.2;
-          ctx.globalAlpha = 0.95;
+          ctx.lineWidth = 1.6;
+          ctx.globalAlpha = 0.9;
         } else if (isDimmed) {
-          ctx.strokeStyle = l.color;
-          ctx.lineWidth = 0.6;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
+          ctx.lineWidth = 0.5;
           ctx.globalAlpha = 0.08;
         } else {
-          ctx.strokeStyle = l.color;
-          ctx.lineWidth = 0.9;
-          ctx.globalAlpha = 0.35;
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.11)';
+          ctx.lineWidth = 0.75;
+          ctx.globalAlpha = 0.4;
         }
         ctx.stroke();
       });
       ctx.globalAlpha = 1.0;
 
-      // 2. Draw Nodes (Proper Solid Matte Orbs with Crisp Stroke)
+      // 2. Draw Nodes (Obsidian Graphite & Jewel Hubs)
       nodes.forEach(function(n) {
         const isSelected = n === selectedNode;
         const isHovered = n === hoveredNode;
@@ -810,48 +773,47 @@ def build_viewer():
 
         const r = n.radius * (isSelected ? 1.4 : (isHovered ? 1.25 : 1.0));
 
-        // Soft outer focus ring if selected or hovered
+        // Soft outer focus halo
         if (isSelected || isHovered) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, r + 4.5, 0, Math.PI * 2);
           ctx.fillStyle = n.color;
-          ctx.globalAlpha = 0.22;
+          ctx.globalAlpha = 0.25;
           ctx.fill();
           ctx.globalAlpha = 1.0;
         }
 
         // Node Body
         ctx.beginPath();
-        ctx.arc(n.x, n.y, Math.max(2, r), 0, Math.PI * 2);
-        ctx.fillStyle = n.color;
-        ctx.globalAlpha = isDimmed ? 0.2 : 1.0;
+        ctx.arc(n.x, n.y, Math.max(1.8, r), 0, Math.PI * 2);
+        ctx.fillStyle = isSelected ? '#ffffff' : n.color;
+        ctx.globalAlpha = isDimmed ? 0.15 : 1.0;
         ctx.fill();
 
-        // Node Rim
-        ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? '#f1f5f9' : 'rgba(0, 0, 0, 0.45)');
-        ctx.lineWidth = isSelected ? 2.5 : (isHovered ? 1.8 : 0.8);
+        // Node Edge Outline
+        ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? '#e5e7eb' : 'rgba(0, 0, 0, 0.6)');
+        ctx.lineWidth = isSelected ? 2.0 : (isHovered ? 1.4 : 0.6);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
 
-        // Clean Matte Typography (with contrast halo)
+        // Clean Obsidian Typography
         const shouldShowLabel = showLabels && (
           isSelected || isHovered || isMatch || isConnected ||
           n.type === 'category' ||
-          (n.type === 'denial_code' && transform.scale > 0.6) ||
-          (n.type === 'scenario' && transform.scale > 1.2)
+          (n.type === 'denial_code' && transform.scale > 0.65) ||
+          (n.type === 'scenario' && transform.scale > 1.3)
         );
 
         if (shouldShowLabel && !isDimmed) {
-          const fontSize = n.type === 'category' ? 12 : (n.type === 'denial_code' ? 11 : 10);
-          ctx.font = (n.type === 'category' || isSelected ? '700 ' : '500 ') + fontSize + 'px -apple-system, sans-serif';
+          const fontSize = n.type === 'category' ? 11.5 : (n.type === 'denial_code' ? 10.5 : 9.5);
+          ctx.font = (n.type === 'category' || isSelected ? '600 ' : '400 ') + fontSize + 'px -apple-system, Inter, sans-serif';
 
-          const maxChars = n.type === 'category' ? 28 : (n.type === 'denial_code' ? 20 : 16);
+          const maxChars = n.type === 'category' ? 26 : (n.type === 'denial_code' ? 18 : 14);
           const displayLabel = n.label.length > maxChars ? n.label.slice(0, maxChars - 2) + '...' : n.label;
 
-          // Dark halo behind text for readability
-          ctx.shadowColor = '#12141a';
-          ctx.shadowBlur = 4;
-          ctx.fillStyle = isSelected ? '#ffffff' : (n.type === 'category' ? '#f8fafc' : '#cbd5e1');
+          ctx.shadowColor = '#000000';
+          ctx.shadowBlur = 5;
+          ctx.fillStyle = isSelected ? '#ffffff' : (n.type === 'category' ? '#f3f4f6' : '#9ca3af');
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
           ctx.fillText(displayLabel, n.x, n.y + r + 3);
@@ -865,20 +827,17 @@ def build_viewer():
 
     draw();
 
-    // Select and inspect a node
     function selectNode(node) {
       selectedNode = node;
       displayNodeDetails(node);
 
-      // Smooth pan to center selected node
       targetTransform = {
         x: -node.x * transform.scale,
         y: -node.y * transform.scale,
-        scale: Math.max(transform.scale, 1.0)
+        scale: Math.max(transform.scale, 1.05)
       };
     }
 
-    // Filter by Category
     function selectCategory(catId) {
       const catNode = nodes.find(function(n) { return n.id === catId; });
       if (catNode) {
@@ -901,10 +860,9 @@ def build_viewer():
       }
     });
 
-    // Control Buttons
     const btnReset = document.getElementById('btn-reset');
     btnReset.addEventListener('click', function() {
-      targetTransform = { x: 0, y: 0, scale: 0.95 };
+      targetTransform = { x: 0, y: 0, scale: 1.0 };
       selectedNode = null;
       filterQuery = '';
       searchBox.value = '';
@@ -913,11 +871,10 @@ def build_viewer():
     const btnLabels = document.getElementById('btn-labels');
     btnLabels.addEventListener('click', function() {
       showLabels = !showLabels;
-      btnLabels.textContent = showLabels ? '🏷️ Labels: ON' : '🏷️ Labels: OFF';
+      btnLabels.textContent = showLabels ? '🏷️ Labels' : '🏷️ Labels: Off';
       btnLabels.classList.toggle('active', showLabels);
     });
 
-    // Sidebar Detail Renderer
     function displayNodeDetails(node) {
       const badge = document.getElementById('badge-type');
       const title = document.getElementById('node-title');
@@ -925,38 +882,35 @@ def build_viewer():
       const container = document.getElementById('dynamic-sections');
 
       badge.textContent = node.type.replace('_', ' ').toUpperCase();
-      badge.style.background = node.color;
-      badge.style.color = '#ffffff';
+      badge.style.background = 'rgba(255, 255, 255, 0.08)';
+      badge.style.color = '#e5e7eb';
 
       title.textContent = node.label;
       desc.textContent = node.description || 'Knowledge graph operational entity.';
 
       let html = '';
 
-      // If Category: show child codes
       if (node.type === 'category') {
         const childCodes = links.filter(function(l) { return l.sourceNode === node; }).map(function(l) { return l.targetNode; });
-        html += '<div class="section-card"><h4><span>📑</span> Denial Codes in Category (' + childCodes.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
+        html += '<div class="section-card"><h4><span>📑</span> Denial Codes (' + childCodes.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
         childCodes.forEach(function(c) {
-          html += '<div class="sub-item-link" onclick="window.selectNodeById(\\'' + c.id + '\\')"><strong>' + c.label + '</strong><div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">' + (c.description || '') + '</div></div>';
+          html += '<div class="sub-item-link" onclick="window.selectNodeById(\\'' + c.id + '\\')"><strong>' + c.label + '</strong><div style="font-size: 11px; color: #6b7280; margin-top: 2px;">' + (c.description || '') + '</div></div>';
         });
         html += '</div></div>';
       }
 
-      // If Denial Code: show scenarios
       if (node.type === 'denial_code') {
         const codeKey = node.properties.code || node.label.split(':')[0].trim();
         const connectedScenarios = nodes.filter(function(n) {
           return n.type === 'scenario' && n.properties && n.properties.code === codeKey;
         });
-        html += '<div class="section-card"><h4><span>📂</span> Associated Operational Scenarios (' + connectedScenarios.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
+        html += '<div class="section-card"><h4><span>📂</span> Associated Scenarios (' + connectedScenarios.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
         connectedScenarios.forEach(function(s) {
-          html += '<div class="sub-item-link" onclick="window.selectNodeById(\\'' + s.id + '\\')"><strong>' + s.label + '</strong><div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">' + (s.description || '') + '</div></div>';
+          html += '<div class="sub-item-link" onclick="window.selectNodeById(\\'' + s.id + '\\')"><strong>' + s.label + '</strong><div style="font-size: 11px; color: #6b7280; margin-top: 2px;">' + (s.description || '') + '</div></div>';
         });
         html += '</div></div>';
       }
 
-      // If Scenario: show investigation, CMS-1500, phone questions, and action playbook
       if (node.type === 'scenario') {
         const children = links.filter(function(l) { return l.sourceNode === node; }).map(function(l) { return l.targetNode; });
         const inv = children.find(function(c) { return c.type === 'investigation_step'; });
@@ -973,9 +927,9 @@ def build_viewer():
         }
 
         if (form && form.properties) {
-          html += '<div class="section-card"><h4><span>📋</span> CMS-1500 & Clearinghouse Fields</h4><div style="font-size: 12px; color: #f1f5f9; line-height: 1.5;"><strong>Form:</strong> ' + (form.properties.form_name || 'CMS-1500') + '<br/><strong>Box/Segment:</strong> <span style="color: #60a5fa; font-weight: bold;">' + (form.properties.box_number || 'N/A') + '</span></div>';
+          html += '<div class="section-card"><h4><span>📋</span> CMS-1500 & Clearinghouse Fields</h4><div style="font-size: 11.5px; color: #d1d5db; line-height: 1.5;"><strong>Form:</strong> ' + (form.properties.form_name || 'CMS-1500') + '<br/><strong>Box/Segment:</strong> <span style="color: #93c5fd; font-weight: 600;">' + (form.properties.box_number || 'N/A') + '</span></div>';
           if (form.properties.required_documents) {
-            html += '<div style="margin-top: 6px; font-size: 11px; color: #94a3b8;"><strong>Required Attachments:</strong> ' + form.properties.required_documents.join(', ') + '</div>';
+            html += '<div style="margin-top: 6px; font-size: 11px; color: #6b7280;"><strong>Required Attachments:</strong> ' + form.properties.required_documents.join(', ') + '</div>';
           }
           html += '</div>';
         }
@@ -991,17 +945,17 @@ def build_viewer():
         if (act && act.properties && act.properties.steps) {
           html += '<div class="section-card"><h4><span>⚡</span> Step-by-Step Resolution Playbook</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
           act.properties.steps.forEach(function(s) {
-            html += '<div style="font-size: 12px; color: #a7f3d0; line-height: 1.4;">✓ ' + s + '</div>';
+            html += '<div style="font-size: 11.5px; color: #e5e7eb; line-height: 1.4;">✓ ' + s + '</div>';
           });
           html += '</div></div>';
         }
 
         if (node.properties && node.properties.standard_notes) {
-          html += '<div class="section-card"><div style="display: flex; justify-content: space-between; align-items: center;"><h4><span>📝</span> Standard AR Call Notes</h4><button class="copy-btn" onclick="copyNotes()">Copy Notes</button></div><div class="notes-box" id="ar-notes-text">' + node.properties.standard_notes + '</div></div>';
+          html += '<div class="section-card"><div style="display: flex; justify-content: space-between; align-items: center;"><h4><span>📝</span> Standard AR Notes</h4><button class="copy-btn" onclick="copyNotes()">Copy Notes</button></div><div class="notes-box" id="ar-notes-text">' + node.properties.standard_notes + '</div></div>';
         }
       }
 
-      container.innerHTML = html || '<div class="hint-box">Cluster node selected. Pan or drag to inspect neighborhood.</div>';
+      container.innerHTML = html || '<div class="hint-box">Select a node in the constellation to inspect its investigation checklist and resolution steps.</div>';
     }
 
     window.copyNotes = function() {
@@ -1010,7 +964,7 @@ def build_viewer():
         navigator.clipboard.writeText(box.innerText);
         const btn = document.querySelector('.copy-btn');
         if (btn) {
-          btn.textContent = '✓ Copied!';
+          btn.textContent = '✓ Copied';
           setTimeout(function() { btn.textContent = 'Copy Notes'; }, 2000);
         }
       }
@@ -1030,7 +984,7 @@ def build_viewer():
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html_content)
 
-    print(f"Cluster Graph Viewer successfully built at: {out_path} ({len(html_content)} bytes)")
+    print(f"Obsidian-Style Graph Viewer successfully built at: {out_path} ({len(html_content)} bytes)")
 
 if __name__ == "__main__":
     build_viewer()
