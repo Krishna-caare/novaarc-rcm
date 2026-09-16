@@ -112,6 +112,14 @@ nova arc/
 │   │   │   ├── auth.py             # JWT token creation, password hashing, user dependencies (require_role)
 │   │   │   ├── config.py           # Pydantic BaseSettings (DATABASE_URL, OPENROUTER_API_KEY, JWT secrets)
 │   │   │   └── database.py         # Async engine, sessionmaker, Base model, init_db schema initialization
+│   │   ├── knowledge_graph/        # Healthcare Denial Knowledge Graph & Scenario Engine
+│   │   │   ├── __init__.py         # Package exports: denial_kg, models, categories
+│   │   │   ├── models.py           # Node, Edge, Category, CARCCode, Scenario dataclasses
+│   │   │   ├── data.py             # 60+ CARC codes & scenarios mapped from arlearningonline.com
+│   │   │   ├── graph_engine.py     # In-memory bidirectional adjacency graph, traversals & D3 export
+│   │   │   ├── inspect.py          # Terminal CLI inspector (python -m app.knowledge_graph.inspect CO-16)
+│   │   │   ├── build_viewer.py     # Generator script for standalone HTML viewer
+│   │   │   └── viewer.html         # Standalone interactive orbital graph canvas visualizer
 │   │   ├── models/
 │   │   │   └── __init__.py         # SQLAlchemy ORM models: User, Patient, Provider, Payer, Claim, Denial,
 │   │   │                           # Payment, WorkQueue, ClaimQueueAssignment, AgentRun
@@ -121,7 +129,7 @@ nova arc/
 │   │   │   ├── auth.py             # Auth endpoints: /register, /login, /me, /users, /roles
 │   │   │   ├── claims.py           # Claims CRUD: /claims, /{id}, /submit, /extract-document, /stats/summary, /reference-data
 │   │   │   ├── dashboard.py        # Analytics: /revenue-health, /ar-health, /payer-performance, /denial-intelligence
-│   │   │   ├── denials.py          # Denials CRUD: /denials, /{id}, /top-codes, /{id}/draft-appeal
+│   │   │   ├── denials.py          # Denials CRUD: /denials, /{id}, /top-codes, /{id}/draft-appeal, /knowledge-graph, /rag-recommendation
 │   │   │   ├── payments.py         # Payments CRUD: /payments, /{id}, /stats/summary
 │   │   │   └── work_queues.py      # Triage queues: /work-queues, /{id}, /{id}/claims, /{id}/claims/{cid}/resolve
 │   │   ├── schemas/
@@ -131,6 +139,7 @@ nova arc/
 │   │   │   ├── appeal_agent.py     # Drafts clinical appeal letters citing CMS/ERISA/LCD guidelines
 │   │   │   ├── coding_agent.py     # Ling 3.0 Flash Santé medical coding extraction + heuristic fallbacks
 │   │   │   ├── denial_predictor.py # ML classifier (RandomForest/XGBoost) computing denial probabilities & risk factors
+│   │   │   ├── denial_rag.py       # GraphRAG Engine synthesizing Knowledge Graph scenarios + LLM recommendations
 │   │   │   ├── edi_parser.py       # HIPAA EDI 837P claim generator and EDI 835 remittance parser
 │   │   │   └── work_queue.py       # Automated claim assignment logic into 7 specialized triage queues
 │   │   └── main.py                 # FastAPI application factory, CORS configuration, exception handlers, /health

@@ -209,3 +209,77 @@ async def draft_appeal(
         confidence=confidence,
         hitl_required=hitl_required
     )
+
+
+@router.get("/knowledge-graph/overview")
+async def get_knowledge_graph_overview(
+    current_user = Depends(get_current_active_user)
+):
+    """Returns overview metrics, categories, and codes in the Denial Knowledge Graph"""
+    from app.knowledge_graph.graph_engine import denial_kg
+    return denial_kg.get_overview()
+
+
+@router.get("/knowledge-graph/{code}")
+async def get_knowledge_graph_code_subgraph(
+    code: str,
+    current_user = Depends(get_current_active_user)
+):
+    """Returns the connected subgraph (scenarios, investigation, forms, call scripts) for a CARC code"""
+    from app.knowledge_graph.graph_engine import denial_kg
+    subgraph = denial_kg.get_subgraph(code)
+    if not subgraph:
+        raise HTTPException(status_code=404, detail=f"Denial code {code} not found in Knowledge Graph")
+    return subgraph.to_dict()
+
+
+@router.post("/{denial_id}/rag-recommendation")
+async def get_denial_rag_recommendation(
+    denial_id: int,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """
+    Executes the Hybrid GraphRAG pipeline on a specific denial:
+    Traverses the Knowledge Graph, diagnoses the scenario, and returns:
+    - Root cause analysis
+    - Investigation checklist
+    - Form & CMS-1500 box requirements
+    - Payer call script
+    - Step-by-step resolution playbook
+    - Pre-formatted standard AR call notes
+    """
+    query = select(Denial).options(
+        selectinload(Denial.claim).selectinload(Claim.patient),
+        selectinload(Denial.claim).selectinload(Claim.provider),
+        selectinload(Denial.claim).selectinload(Claim.payer)
+    ).where(Denial.denial_id == denial_id)
+
+    result = await db.execute(query)
+    denial = result.scalar_one_or_none()
+
+    if not denial:
+        raise HTTPException(status_code=404, detail="Denial not found")
+
+    claim = denial.claim
+    claim_context = {
+        "claim_id": claim.claim_id,
+        "denial_id": denial.denial_id,
+        "denial_code": denial.denial_code or "CO-16",
+        "description": denial.description or "",
+        "root_cause": denial.root_cause or "",
+        "denied_amount": float(denial.denied_amount or 0),
+        "denial_date": str(denial.denial_date) if denial.denial_date else "",
+        "date_of_service": str(claim.date_of_service) if claim.date_of_service else "",
+        "charge_amount": float(claim.charge_amount or 0),
+        "cpt_codes": claim.cpt_codes or [],
+        "icd10_codes": claim.icd10_codes or [],
+        "modifiers": claim.modifiers or [],
+        "patient_mrn": claim.patient.mrn if claim.patient else "",
+        "provider_name": claim.provider.name if claim.provider else "",
+        "payer_name": claim.payer.name if claim.payer else "",
+    }
+
+    from app.services.denial_rag import run_denial_rag
+    recommendation = await run_denial_rag(claim_context)
+    return recommendation

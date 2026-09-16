@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>NovaArc RCM — Denial Knowledge Graph Explorer</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background-color: #070a12;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      overflow: hidden;
+      width: 100vw;
+      height: 100vh;
+      display: flex;
+    }
+    #canvas-container {
+      flex: 1;
+      position: relative;
+      height: 100%;
+      background: radial-gradient(circle at center, #111a2e 0%, #050811 100%);
+    }
+    canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      cursor: grab;
+    }
+    canvas:active { cursor: grabbing; }
+
+    /* Top Bar */
+    .top-bar {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      right: 16px;
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .top-bar > * { pointer-events: auto; }
+    .brand-badge {
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(59, 130, 246, 0.4);
+      backdrop-filter: blur(8px);
+      padding: 8px 16px;
+      border-radius: 9999px;
+      font-size: 13px;
+      font-weight: 600;
+      color: #60a5fa;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+    .brand-badge .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #38bdf8;
+      box-shadow: 0 0 10px #38bdf8;
+    }
+    .search-input {
+      flex: 1;
+      max-width: 380px;
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      backdrop-filter: blur(8px);
+      padding: 9px 16px;
+      border-radius: 9999px;
+      color: #fff;
+      font-size: 13px;
+      outline: none;
+      transition: all 0.2s;
+    }
+    .search-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.4);
+    }
+    .legend-chips {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .legend-chip {
+      background: rgba(15, 23, 42, 0.75);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      padding: 5px 10px;
+      border-radius: 6px;
+      font-size: 11px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      cursor: pointer;
+      user-select: none;
+      transition: all 0.2s;
+    }
+    .legend-chip:hover { border-color: #94a3b8; background: rgba(30, 41, 59, 0.8); }
+    .legend-chip .orb-icon { width: 8px; height: 8px; border-radius: 50%; }
+
+    /* Detail Sidebar */
+    .sidebar {
+      width: 450px;
+      height: 100%;
+      background: #0b1120;
+      border-left: 1px solid rgba(148, 163, 184, 0.15);
+      padding: 24px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: -10px 0 30px rgba(0, 0, 0, 0.6);
+      z-index: 20;
+    }
+    .sidebar-header {
+      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      padding-bottom: 16px;
+    }
+    .node-type-badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
+    }
+    .sidebar-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #f8fafc;
+      line-height: 1.3;
+    }
+    .sidebar-desc {
+      font-size: 13px;
+      color: #94a3b8;
+      line-height: 1.5;
+      margin-top: 6px;
+    }
+    .section-card {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px solid rgba(148, 163, 184, 0.15);
+      border-radius: 8px;
+      padding: 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .section-card h4 {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #38bdf8;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .checklist-item {
+      font-size: 12px;
+      color: #cbd5e1;
+      display: flex;
+      gap: 8px;
+      line-height: 1.4;
+    }
+    .checklist-item::before {
+      content: "•";
+      color: #38bdf8;
+      font-weight: bold;
+    }
+    .script-item {
+      background: rgba(15, 23, 42, 0.5);
+      border-left: 2px solid #ec4899;
+      padding: 6px 10px;
+      border-radius: 0 4px 4px 0;
+      font-size: 12px;
+      color: #f1f5f9;
+      font-style: italic;
+    }
+    .copy-btn {
+      background: #2563eb;
+      color: #fff;
+      border: none;
+      padding: 6px 10px;
+      border-radius: 4px;
+      font-size: 11px;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      transition: background 0.2s;
+    }
+    .copy-btn:hover { background: #1d4ed8; }
+    .notes-box {
+      background: #050811;
+      border: 1px solid #1e293b;
+      padding: 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 11px;
+      color: #94a3b8;
+      white-space: pre-wrap;
+      max-height: 130px;
+      overflow-y: auto;
+    }
+    .hint-text {
+      font-size: 12px;
+      color: #64748b;
+      text-align: center;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <div id="canvas-container">
+    <div class="top-bar">
+      <div class="brand-badge">
+        <span class="dot"></span>
+        <span>NovaArc Knowledge Graph Orb</span>
+      </div>
+      <input type="text" id="search-box" class="search-input" placeholder="Search code or keyword (e.g. CO-16, operative, modifier 25)..." />
+      <div class="legend-chips">
+        <div class="legend-chip"><span class="orb-icon" style="background: #3b82f6;"></span> Category</div>
+        <div class="legend-chip"><span class="orb-icon" style="background: #60a5fa;"></span> CARC Code</div>
+        <div class="legend-chip"><span class="orb-icon" style="background: #34d399;"></span> Scenario</div>
+        <div class="legend-chip"><span class="orb-icon" style="background: #c084fc;"></span> CMS-1500 Box</div>
+        <div class="legend-chip"><span class="orb-icon" style="background: #2dd4bf;"></span> Action Plan</div>
+      </div>
+    </div>
+    <canvas id="graph-canvas"></canvas>
+  </div>
+
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div>
+        <div class="node-type-badge" id="badge-type" style="background: #1e3a8a; color: #93c5fd;">Interactive Inspector</div>
+        <h3 class="sidebar-title" id="node-title">Denial Knowledge Graph</h3>
+      </div>
+    </div>
+    <div class="sidebar-desc" id="node-desc">
+      Click on any glowing orbital node in the network to inspect its sub-scenarios, CMS-1500 box mappings, payer call scripts, and step-by-step resolution playbooks.
+    </div>
+
+    <div id="dynamic-sections" style="display: flex; flex-direction: column; gap: 14px;">
+      <div class="hint-text">
+        Tip: Drag nodes to explore orbital connections, or use mouse wheel to zoom in and out.
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const graphData = {"nodes": [{"id": "CAT_MISSING_INFO", "label": "Missing Information & Documentation", "type": "category", "description": "Claims denied due to absent clinical documentation, invoices, missing modifiers, or incomplete claim form fields.", "properties": {"color": "#3b82f6"}, "radius": 32, "color": "#3b82f6"}, {"id": "CAT_PRIOR_AUTH", "label": "Prior Authorization & Referrals", "type": "category", "description": "Denials related to lack of pre-certification, missing referral numbers, authorization validity date mismatches, or retro-auths.", "properties": {"color": "#8b5cf6"}, "radius": 32, "color": "#8b5cf6"}, {"id": "CAT_TIMELY_FILING", "label": "Timely Filing & Deadlines", "type": "category", "description": "Denials where submission exceeded payer timely filing limits, requiring proof of timely filing or contractual write-off.", "properties": {"color": "#ef4444"}, "radius": 32, "color": "#ef4444"}, {"id": "CAT_COB", "label": "Coordination of Benefits & Third Party Liability", "type": "category", "description": "Cross-payer disputes, primary vs secondary coverage, Medicare Secondary Payer (MSP), or patient COB update requirements.", "properties": {"color": "#f59e0b"}, "radius": 32, "color": "#f59e0b"}, {"id": "CAT_MEDICAL_NECESSITY", "label": "Medical Necessity & Level of Service", "type": "category", "description": "Clinical denials where service was deemed non-covered, experimental, or downcoded, requiring physician appeals or peer-to-peer reviews.", "properties": {"color": "#10b981"}, "radius": 32, "color": "#10b981"}, {"id": "CAT_CODING_MODIFIERS", "label": "Coding, Inconsistencies & Modifier Edits", "type": "category", "description": "Inconsistencies between diagnosis and procedure, patient age/gender mismatches, missing/invalid modifiers, or provider specialty rules.", "properties": {"color": "#06b6d4"}, "radius": 32, "color": "#06b6d4"}, {"id": "CAT_DUPLICATE_BUNDLING", "label": "Duplicate, Bundling & NCCI Edits", "type": "category", "description": "Exact duplicate claims, services included in payment for another procedure (inclusive/bundled), or global period violations.", "properties": {"color": "#ec4899"}, "radius": 32, "color": "#ec4899"}, {"id": "CAT_ELIGIBILITY", "label": "Eligibility, Identification & Termination", "type": "category", "description": "Patient not identified, expenses incurred prior to/after coverage dates, incorrect member ID, or demographic mismatches.", "properties": {"color": "#6366f1"}, "radius": 32, "color": "#6366f1"}, {"id": "CODE_CO_16", "label": "CO-16: Lacks Information / Billing Error", "type": "denial_code", "description": "Claim/service lacks information or has submission/billing error(s).", "properties": {"code": "CO-16", "category_id": "CAT_MISSING_INFO"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_16_OP_NOTE", "label": "Missing Operative Report / Surgical Notes", "type": "scenario", "description": "Payer requested signed operative or procedure report to substantiate surgical CPT code.", "properties": {"raw_id": "CO-16-OP-NOTE", "code": "CO-16", "standard_notes": "CALL STATUS: Claim denied CO-16 for Operative Report. Spoke with Rep: [RepName] | Call Ref#: [CallRef]. Verified fax#: [FaxNumber]. Time limit: [TimeLimit] days from [DenialDate]. Sent signed operative report via fax with confirmation. Next follow-up: 21 days."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_16_OP_NOTE", "label": "Investigation: Missing Operative Report / Sur...", "type": "investigation_step", "description": "Check EHR: Is the operative note dictated, finalized, and electronically signed by the surgeon?; Verify if the operative note has already been transmitted via clearinghouse attachment or fax.; Verify if a remark code (RARC) accompanied the denial (e.g., M127, N29).", "properties": {"steps": ["Check EHR: Is the operative note dictated, finalized, and electronically signed by the surgeon?", "Verify if the operative note has already been transmitted via clearinghouse attachment or fax.", "Verify if a remark code (RARC) accompanied the denial (e.g., M127, N29)."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_16_OP_NOTE", "label": "Call Script: Missing Operative Report / Sur...", "type": "payer_question", "description": "4 phone inquiry questions", "properties": {"question_1": "May I know the exact denial date and the specific documents requested by your review department?", "question_2": "What is the dedicated fax number or mailing address with department attention to send the operative report?", "question_3": "What is the time limit from the denial date to submit these records before the claim is closed?", "question_4": "May I please have the claim number, call reference number, and your name?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_16_OP_NOTE", "label": "Form: CMS-1500 / EDI 275 Attachment", "type": "form_requirement", "description": "Box: PWK Segment (EDI 837) / Attachment Control Number in Box 19", "properties": {"form_name": "CMS-1500 / EDI 275 Attachment", "box_number": "PWK Segment (EDI 837) / Attachment Control Number in Box 19", "required_documents": ["Signed Operative Report", "Pathology Report (if biopsy/excision)", "Claim Cover Sheet with Claim ID & NPI"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_16_OP_NOTE", "label": "Action Plan: Missing Operative Report / Sur...", "type": "action_plan", "description": "4 step resolution playbook", "properties": {"steps": ["Step 1: Pull the signed operative note and clinical record from EHR.", "Step 2: Check time limit. If within deadline, fax documents with claim cover sheet to the payer's medical review fax number.", "Step 3: Document the fax transmission receipt / confirmation page.", "Step 4: Set follow-up task for 21-30 days to verify document receipt and claim re-adjudication."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "SCENARIO_CO_16_MOD_25", "label": "Missing Modifier 25 on Evaluation & Management (E/M)", "type": "scenario", "description": "E/M service billed on the same date of service as a minor surgical procedure or injection without modifier 25.", "properties": {"raw_id": "CO-16-MOD-25", "code": "CO-16", "standard_notes": "STATUS: Denied CO-16 for missing modifier 25. Reviewed notes; separate E/M validated. Corrected claim generated with Modifier 25 appended to CPT in Box 24D and Frequency Code 7 in Box 22. Electronically resubmitted."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_16_MOD_25", "label": "Investigation: Missing Modifier 25 on Evaluat...", "type": "investigation_step", "description": "Check Box 24D: Was an E/M code (99212-99215) billed alongside a procedure (e.g., 20610, 17000, 93000)?; Verify clinical notes: Does documentation reflect a separately identifiable medical evaluation?", "properties": {"steps": ["Check Box 24D: Was an E/M code (99212-99215) billed alongside a procedure (e.g., 20610, 17000, 93000)?", "Verify clinical notes: Does documentation reflect a separately identifiable medical evaluation?"]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_16_MOD_25", "label": "Call Script: Missing Modifier 25 on Evaluat...", "type": "payer_question", "description": "3 phone inquiry questions", "properties": {"question_1": "Can you confirm if adding modifier 25 to the E/M code will allow claim reprocessing?", "question_2": "Does your payer require medical records with the corrected claim, or can it be resubmitted electronically?", "question_3": "What is your timely filing limit for corrected claims (Claim Frequency Code 7)?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_16_MOD_25", "label": "Form: CMS-1500", "type": "form_requirement", "description": "Box: Box 24D (Modifier Column)", "properties": {"form_name": "CMS-1500", "box_number": "Box 24D (Modifier Column)", "required_documents": ["Corrected Claim (Frequency Code 7 / Resubmission Code in Box 22)"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_16_MOD_25", "label": "Action Plan: Missing Modifier 25 on Evaluat...", "type": "action_plan", "description": "4 step resolution playbook", "properties": {"steps": ["Step 1: Confirm medical necessity for separate E/M in documentation.", "Step 2: Append Modifier 25 to the E/M procedure code in billing software.", "Step 3: Set Claim Frequency Code to '7' (Replacement of Prior Claim) and include original Payer Claim Control # in Box 22.", "Step 4: Submit electronically to clearinghouse and verify 277 acknowledgement."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "SCENARIO_CO_16_TAXONOMY_NPI", "label": "Missing or Invalid Billing/Rendering NPI or Taxonomy", "type": "scenario", "description": "Claim submitted with missing or mismatched provider NPI, taxonomy code, or service facility address.", "properties": {"raw_id": "CO-16-TAXONOMY-NPI", "code": "CO-16", "standard_notes": "STATUS: Denied CO-16 for provider taxonomy/NPI mismatch. Corrected Box 24J/33a with enrolled taxonomy code. Resubmitted claim."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_16_TAXONOMY_NPI", "label": "Investigation: Missing or Invalid Billing/Ren...", "type": "investigation_step", "description": "Check Box 24J (Rendering NPI), Box 32a (Facility NPI), and Box 33a (Billing NPI).; Check NPPES registry: Does the taxonomy code match the specialty enrolled with this payer?", "properties": {"steps": ["Check Box 24J (Rendering NPI), Box 32a (Facility NPI), and Box 33a (Billing NPI).", "Check NPPES registry: Does the taxonomy code match the specialty enrolled with this payer?"]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_16_TAXONOMY_NPI", "label": "Call Script: Missing or Invalid Billing/Ren...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Which specific provider field is missing or invalid on this claim (Rendering, Billing, or Facility)?", "question_2": "Is the provider's taxonomy code required in Box 33b / 24J qualifier ZZ?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_16_TAXONOMY_NPI", "label": "Form: CMS-1500", "type": "form_requirement", "description": "Box: Box 24J (Rendering), Box 32a (Facility), Box 33a (Billing Provider)", "properties": {"form_name": "CMS-1500", "box_number": "Box 24J (Rendering), Box 32a (Facility), Box 33a (Billing Provider)", "required_documents": ["W-9 Form / Provider Enrollment Confirmation"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_16_TAXONOMY_NPI", "label": "Action Plan: Missing or Invalid Billing/Ren...", "type": "action_plan", "description": "3 step resolution playbook", "properties": {"steps": ["Step 1: Correct the NPI or add ZZ qualifier with appropriate taxonomy code in Box 33b/24J.", "Step 2: Verify provider enrollment status in payer portal.", "Step 3: Rebill as corrected claim."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_197", "label": "CO-197: Prior Authorization Absent", "type": "denial_code", "description": "Precertification/Authorization/Notification/Pre-treatment absent.", "properties": {"code": "CO-197", "category_id": "CAT_PRIOR_AUTH"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_197_AUTH_ON_FILE", "label": "Authorization Obtained but Missing from Claim", "type": "scenario", "description": "Prior authorization was approved prior to the procedure, but the auth number was omitted from Box 23 or had a typo.", "properties": {"raw_id": "CO-197-AUTH-ON-FILE", "code": "CO-197", "standard_notes": "STATUS: Denied CO-197. Verified prior auth #[AuthNumber] valid on DOS. Spoke with Rep: [RepName], Ref#: [CallRef]. Claim sent for phone reprocessing / corrected claim sent with auth in Box 23. Follow up: 30 days."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_197_AUTH_ON_FILE", "label": "Investigation: Authorization Obtained but Mis...", "type": "investigation_step", "description": "Check authorization log / EHR: Was prior auth issued for this patient, DOS, CPT, and provider?; Check CMS-1500 Box 23 / EDI 2300 REF*G1 segment on the original 837 file.", "properties": {"steps": ["Check authorization log / EHR: Was prior auth issued for this patient, DOS, CPT, and provider?", "Check CMS-1500 Box 23 / EDI 2300 REF*G1 segment on the original 837 file."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_197_AUTH_ON_FILE", "label": "Call Script: Authorization Obtained but Mis...", "type": "payer_question", "description": "3 phone inquiry questions", "properties": {"question_1": "We have prior authorization #[AuthNumber] approved on [AuthDate]. Can you reprocess the claim on call with this auth number?", "question_2": "If reprocessing on call is not permitted, should we submit a corrected claim or a formal dispute with the approval letter?", "question_3": "What is the representative name, call reference number, and turnaround time for reprocessing?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_197_AUTH_ON_FILE", "label": "Form: CMS-1500", "type": "form_requirement", "description": "Box: Box 23 (Prior Authorization Number)", "properties": {"form_name": "CMS-1500", "box_number": "Box 23 (Prior Authorization Number)", "required_documents": ["Payer Prior Authorization Approval Letter"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_197_AUTH_ON_FILE", "label": "Action Plan: Authorization Obtained but Mis...", "type": "action_plan", "description": "4 step resolution playbook", "properties": {"steps": ["Step 1: Obtain copy of the authorization approval letter showing valid date range and CPT.", "Step 2: If payer representative allows phone adjustment, request reprocessing and record Call Ref#.", "Step 3: If rebill is required, insert auth # into Box 23, set Frequency Code 7 in Box 22, and transmit.", "Step 4: If appeal is required, attach auth approval letter to dispute form and submit."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "SCENARIO_CO_197_RETRO_AUTH", "label": "Authorization Not Obtained Prior to Service (Retro-Auth Needed)", "type": "scenario", "description": "Service rendered without pre-certification due to urgent clinical circumstances or intake oversight.", "properties": {"raw_id": "CO-197-RETRO-AUTH", "code": "CO-197", "standard_notes": "STATUS: Denied CO-197. Auth was not on file. Initiated retrospective authorization request with payer clinical intake. Attached emergent documentation. Awaiting auth decision."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_197_RETRO_AUTH", "label": "Investigation: Authorization Not Obtained Pri...", "type": "investigation_step", "description": "Check payer policy: Does this payer accept retroactive authorization requests within 14/30 days of DOS?; Was the encounter an emergency or urgent admission meeting retrospective review criteria?", "properties": {"steps": ["Check payer policy: Does this payer accept retroactive authorization requests within 14/30 days of DOS?", "Was the encounter an emergency or urgent admission meeting retrospective review criteria?"]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_197_RETRO_AUTH", "label": "Call Script: Authorization Not Obtained Pri...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Does the payer permit retrospective authorization requests for urgent/emergent circumstances for this service?", "question_2": "What is the deadline and submission portal/fax number for the retro-authorization department?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_197_RETRO_AUTH", "label": "Form: Payer Retro-Authorization Request Form", "type": "form_requirement", "description": "Box: N/A (Clinical Appeal Packet)", "properties": {"form_name": "Payer Retro-Authorization Request Form", "box_number": "N/A (Clinical Appeal Packet)", "required_documents": ["Retro-Auth Form", "Emergency Room / Urgent Clinical Notes", "Letter of Medical Urgency from Physician"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_197_RETRO_AUTH", "label": "Action Plan: Authorization Not Obtained Pri...", "type": "action_plan", "description": "4 step resolution playbook", "properties": {"steps": ["Step 1: Contact provider/intake to submit an expedited retrospective authorization request.", "Step 2: If retro-auth is approved, submit corrected claim with auth in Box 23.", "Step 3: If retro-auth is denied or not allowed by contract, file clinical appeal with proof of medical emergency.", "Step 4: If all appeals exhausted and no patient waiver exists, contractual write-off per provider agreement."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_29", "label": "CO-29: Timely Filing Limit Expired", "type": "denial_code", "description": "The time limit for filing has expired.", "properties": {"code": "CO-29", "category_id": "CAT_TIMELY_FILING"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_29_PROOF_AVAILABLE", "label": "Initial Claim Submitted Timely (Proof of Timely Filing Available)", "type": "scenario", "description": "Claim was submitted within payer deadline (e.g., 90/180/365 days), but payer delayed adjudication or lost initial transmission.", "properties": {"raw_id": "CO-29-PROOF-AVAILABLE", "code": "CO-29", "standard_notes": "STATUS: Denied CO-29. Verified initial submission on [InitialDate] within [Limit] day deadline. Retrieved EDI 277 Acceptance proof (Trace#[TraceID]). Compiled timely filing appeal package. Faxed to appeals dept. Next follow-up: 30 days."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_29_PROOF_AVAILABLE", "label": "Investigation: Initial Claim Submitted Timely...", "type": "investigation_step", "description": "Calculate days between Date of Service and initial submission date.; Search clearinghouse archive for EDI 999 (Functional Acknowledgement) and EDI 277 (Claim Acceptance).; Check for payer electronic batch confirmation number, certified mail tracking, or fax receipt.", "properties": {"steps": ["Calculate days between Date of Service and initial submission date.", "Search clearinghouse archive for EDI 999 (Functional Acknowledgement) and EDI 277 (Claim Acceptance).", "Check for payer electronic batch confirmation number, certified mail tracking, or fax receipt."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_29_PROOF_AVAILABLE", "label": "Call Script: Initial Claim Submitted Timely...", "type": "payer_question", "description": "3 phone inquiry questions", "properties": {"question_1": "What is the contractual timely filing limit for this provider and plan (90, 180, or 365 days)?", "question_2": "We show initial electronic submission on [InitialDate] with Batch/Trace#[TraceID]. Do you have record of this transmission?", "question_3": "What is the dedicated fax number or address for the Timely Filing Dispute Department?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_29_PROOF_AVAILABLE", "label": "Form: Timely Filing Appeal Packet", "type": "form_requirement", "description": "Box: N/A", "properties": {"form_name": "Timely Filing Appeal Packet", "box_number": "N/A", "required_documents": ["Clearinghouse EDI 999 Acceptance Report", "EDI 277 Claim Acknowledgement Report", "CMS-1500 Form copy stamped with original submission date", "Timely Filing Rebuttal Cover Letter"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_29_PROOF_AVAILABLE", "label": "Action Plan: Initial Claim Submitted Timely...", "type": "action_plan", "description": "4 step resolution playbook", "properties": {"steps": ["Step 1: Download EDI 999 and 277 acceptance reports showing payer-assigned trace ID.", "Step 2: Draft Timely Filing Appeal Letter citing initial transmission date vs contractual deadline.", "Step 3: Submit complete proof package to payer timely filing appeals department via certified mail or secure portal.", "Step 4: Track certified receipt and follow up within 30-45 days."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "SCENARIO_CO_29_NO_PROOF", "label": "Claim Submitted Past Timely Filing Deadline (Write-Off Evaluation)", "type": "scenario", "description": "Initial submission was delayed past deadline without qualifying extenuating circumstances.", "properties": {"raw_id": "CO-29-NO-PROOF", "code": "CO-29", "standard_notes": "STATUS: Denied CO-29. Confirmed claim submitted past filing limit without valid proof. Adjustment required per provider network agreement."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_29_NO_PROOF", "label": "Investigation: Claim Submitted Past Timely Fi...", "type": "investigation_step", "description": "Verify if primary payer delay applies (secondary timely filing runs from primary EOB date).; Check if patient retroactive Medicaid enrollment or system outage occurred.", "properties": {"steps": ["Verify if primary payer delay applies (secondary timely filing runs from primary EOB date).", "Check if patient retroactive Medicaid enrollment or system outage occurred."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_29_NO_PROOF", "label": "Call Script: Claim Submitted Past Timely Fi...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Can secondary timely filing be calculated from the primary payment date rather than DOS?", "question_2": "Does the plan accept late filing exceptions for retroactive member eligibility?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_29_NO_PROOF", "label": "Form: Financial Adjustment Form", "type": "form_requirement", "description": "Box: N/A", "properties": {"form_name": "Financial Adjustment Form", "box_number": "N/A", "required_documents": ["Primary EOB showing late adjudication (if secondary claim)"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_29_NO_PROOF", "label": "Action Plan: Claim Submitted Past Timely Fi...", "type": "action_plan", "description": "2 step resolution playbook", "properties": {"steps": ["Step 1: If secondary claim, appeal with primary EOB showing timely submission from primary ERA date.", "Step 2: If genuine provider filing delay with in-network contract, write off balance as contractual adjustment (cannot bill patient)."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_22", "label": "CO-22: Coordination of Benefits (COB) Required", "type": "denial_code", "description": "This care may be covered by another payer per coordination of benefits.", "properties": {"code": "CO-22", "category_id": "CAT_COB"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_22_PATIENT_UPDATE", "label": "Patient Must Update COB with Payer", "type": "scenario", "description": "Payer requires insured patient to complete annual Coordination of Benefits questionnaire confirming other insurance.", "properties": {"raw_id": "CO-22-PATIENT-UPDATE", "code": "CO-22", "standard_notes": "STATUS: Denied CO-22. Insurer requires member COB update. Contacted patient: advised to call [PayerPhone] to complete COB questionnaire. Placed claim in follow-up queue for 10 days."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_22_PATIENT_UPDATE", "label": "Investigation: Patient Must Update COB with P...", "type": "investigation_step", "description": "Check payer portal: Is the policy flagged for 'COB Update Needed'?; Verify if patient has secondary commercial insurance, Medicare, or spouse coverage.", "properties": {"steps": ["Check payer portal: Is the policy flagged for 'COB Update Needed'?", "Verify if patient has secondary commercial insurance, Medicare, or spouse coverage."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_22_PATIENT_UPDATE", "label": "Call Script: Patient Must Update COB with P...", "type": "payer_question", "description": "3 phone inquiry questions", "properties": {"question_1": "Can provider update COB on the patient's behalf, or must the member call directly?", "question_2": "What is the direct member services phone number and web portal link for the patient to update COB?", "question_3": "Once the member updates COB, will the claim automatically reprocess or should we call back?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_22_PATIENT_UPDATE", "label": "Form: Patient COB Verification Form", "type": "form_requirement", "description": "Box: Box 11d (Another Health Benefit Plan)", "properties": {"form_name": "Patient COB Verification Form", "box_number": "Box 11d (Another Health Benefit Plan)", "required_documents": ["Payer Member Services Phone Number", "Patient Demographic Sheet"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_22_PATIENT_UPDATE", "label": "Action Plan: Patient Must Update COB with P...", "type": "action_plan", "description": "4 step resolution playbook", "properties": {"steps": ["Step 1: Contact patient via phone and billing portal alert explaining insurance holds claim pending COB update.", "Step 2: Provide patient with payer's direct toll-free member number and policy ID.", "Step 3: Allow 7-10 business days for patient to call insurer.", "Step 4: Check payer portal for updated COB status and request claim reprocessing."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "SCENARIO_CO_22_PRIMARY_DISPUTE", "label": "Billed as Primary but Payer is Secondary", "type": "scenario", "description": "Claim submitted to secondary insurance as primary, or Medicare Secondary Payer (MSP) rules apply.", "properties": {"raw_id": "CO-22-PRIMARY-DISPUTE", "code": "CO-22", "standard_notes": "STATUS: Denied CO-22. Payer is secondary to [PrimaryPayer]. Re-routed claim to primary carrier with original DOS. Secondary claim held pending primary ERA."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_22_PRIMARY_DISPUTE", "label": "Investigation: Billed as Primary but Payer is...", "type": "investigation_step", "description": "Check patient registration: Is another insurer listed as primary coverage?; Review Medicare MSP questionnaire: Is patient employed, covered under spouse group health plan, or ESRD?", "properties": {"steps": ["Check patient registration: Is another insurer listed as primary coverage?", "Review Medicare MSP questionnaire: Is patient employed, covered under spouse group health plan, or ESRD?"]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_22_PRIMARY_DISPUTE", "label": "Call Script: Billed as Primary but Payer is...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Who does your system show as the primary carrier on this date of service?", "question_2": "What is the primary policy number, group number, and effective date listed in your records?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_22_PRIMARY_DISPUTE", "label": "Form: CMS-1500 / Secondary EDI 837", "type": "form_requirement", "description": "Box: Box 9 (Other Insured) and Box 11 (Insured Policy)", "properties": {"form_name": "CMS-1500 / Secondary EDI 837", "box_number": "Box 9 (Other Insured) and Box 11 (Insured Policy)", "required_documents": ["Primary Payer EOB / ERA Remittance"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_22_PRIMARY_DISPUTE", "label": "Action Plan: Billed as Primary but Payer is...", "type": "action_plan", "description": "2 step resolution playbook", "properties": {"steps": ["Step 1: Bill the verified primary insurance carrier with clean initial claim.", "Step 2: Once primary pays and issues EOB/ERA, attach EOB and bill secondary carrier."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_4", "label": "CO-4: Modifier Inconsistent / Missing", "type": "denial_code", "description": "The procedure code is inconsistent with the modifier used or a required modifier is missing.", "properties": {"code": "CO-4", "category_id": "CAT_CODING_MODIFIERS"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_4_ANATOMICAL", "label": "Missing Anatomical Modifier (RT/LT/E1-E4/FA-F9)", "type": "scenario", "description": "Procedure performed on paired organ or extremity billed without lateral modifier.", "properties": {"raw_id": "CO-4-ANATOMICAL", "code": "CO-4", "standard_notes": "STATUS: Denied CO-4 for anatomical modifier. Appended modifier [RT/LT] per operative report. Resubmitted as corrected claim."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_4_ANATOMICAL", "label": "Investigation: Missing Anatomical Modifier (R...", "type": "investigation_step", "description": "Check operative/clinical note: Was procedure performed on Left, Right, or Bilateral site?; Check CPT guidelines: Does procedure require RT, LT, or 50 modifier?", "properties": {"steps": ["Check operative/clinical note: Was procedure performed on Left, Right, or Bilateral site?", "Check CPT guidelines: Does procedure require RT, LT, or 50 modifier?"]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_4_ANATOMICAL", "label": "Call Script: Missing Anatomical Modifier (R...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Does this CPT require anatomical modifier RT/LT or bilateral modifier 50?", "question_2": "Can this be corrected via electronic corrected claim (Frequency 7)?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_4_ANATOMICAL", "label": "Form: CMS-1500", "type": "form_requirement", "description": "Box: Box 24D (Modifier 1-4)", "properties": {"form_name": "CMS-1500", "box_number": "Box 24D (Modifier 1-4)", "required_documents": ["Corrected Claim", "Clinical Documentation"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_4_ANATOMICAL", "label": "Action Plan: Missing Anatomical Modifier (R...", "type": "action_plan", "description": "3 step resolution playbook", "properties": {"steps": ["Step 1: Verify documentation for exact anatomical site.", "Step 2: Append RT, LT, or 50 in Box 24D.", "Step 3: Resubmit as Frequency Code 7 corrected claim."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_18", "label": "CO-18: Duplicate Claim / Service", "type": "denial_code", "description": "Exact duplicate claim/service.", "properties": {"code": "CO-18", "category_id": "CAT_DUPLICATE_BUNDLING"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_18_ALREADY_PAID", "label": "Service Already Adjudicated / Paid on Previous Claim", "type": "scenario", "description": "Claim was submitted multiple times in error, and the first submission was already paid or processed.", "properties": {"raw_id": "CO-18-ALREADY-PAID", "code": "CO-18", "standard_notes": "STATUS: Denied CO-18 duplicate. Verified original claim #[OrigClaimID] paid on [PaidDate] under Check#[CheckNum]. Adjusted duplicate claim balance to zero."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_18_ALREADY_PAID", "label": "Investigation: Service Already Adjudicated / ...", "type": "investigation_step", "description": "Search billing system and payer portal for same patient, DOS, CPT, and charge amount.; Check if an ERA / payment was posted to another claim control number.", "properties": {"steps": ["Search billing system and payer portal for same patient, DOS, CPT, and charge amount.", "Check if an ERA / payment was posted to another claim control number."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_18_ALREADY_PAID", "label": "Call Script: Service Already Adjudicated / ...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Can you provide the original claim number and payment date where this service was processed?", "question_2": "What was the check/EFT number and amount paid on the original claim?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_18_ALREADY_PAID", "label": "Form: Payment Reconciliation Ledger", "type": "form_requirement", "description": "Box: N/A", "properties": {"form_name": "Payment Reconciliation Ledger", "box_number": "N/A", "required_documents": ["Original EOB / ERA showing prior payment"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_18_ALREADY_PAID", "label": "Action Plan: Service Already Adjudicated / ...", "type": "action_plan", "description": "2 step resolution playbook", "properties": {"steps": ["Step 1: If original claim paid correctly, void/close duplicate claim in system and cross-reference check number.", "Step 2: If original claim was denied incorrectly, pursue appeal on the original claim ID, not the duplicate."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "SCENARIO_CO_18_REPEAT_PROCEDURE", "label": "Legitimate Repeat Procedure on Same Date of Service", "type": "scenario", "description": "Distinct procedural session occurred on same day (e.g. repeat EKG, bilateral x-ray, multiple lesions) without repeat modifier.", "properties": {"raw_id": "CO-18-REPEAT-PROCEDURE", "code": "CO-18", "standard_notes": "STATUS: Denied CO-18. Verified distinct repeat procedure in chart. Appended modifier 76. Resubmitted with encounter records."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_18_REPEAT_PROCEDURE", "label": "Investigation: Legitimate Repeat Procedure on...", "type": "investigation_step", "description": "Check clinical records: Was procedure repeated at a separate encounter or distinct anatomical site?; Verify if Modifier 76 (Repeat procedure by same physician) or Modifier 59/X(EPSU) is justified.", "properties": {"steps": ["Check clinical records: Was procedure repeated at a separate encounter or distinct anatomical site?", "Verify if Modifier 76 (Repeat procedure by same physician) or Modifier 59/X(EPSU) is justified."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_18_REPEAT_PROCEDURE", "label": "Call Script: Legitimate Repeat Procedure on...", "type": "payer_question", "description": "1 phone inquiry questions", "properties": {"question_1": "This was a distinct repeat procedure at [Time]. Will appending Modifier 76 allow payment?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_18_REPEAT_PROCEDURE", "label": "Form: CMS-1500", "type": "form_requirement", "description": "Box: Box 24D (Modifier Column)", "properties": {"form_name": "CMS-1500", "box_number": "Box 24D (Modifier Column)", "required_documents": ["Medical records showing distinct encounter times"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_18_REPEAT_PROCEDURE", "label": "Action Plan: Legitimate Repeat Procedure on...", "type": "action_plan", "description": "2 step resolution playbook", "properties": {"steps": ["Step 1: Append Modifier 76 or 59 to duplicate line item.", "Step 2: Submit corrected claim with medical records showing separate sessions."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_26", "label": "CO-26: Prior to Coverage Effective Date", "type": "denial_code", "description": "Expenses incurred prior to coverage.", "properties": {"code": "CO-26", "category_id": "CAT_ELIGIBILITY"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_26_VERIFY_DATES", "label": "Date of Service Precedes Policy Inception", "type": "scenario", "description": "Care rendered before insurance policy was active.", "properties": {"raw_id": "CO-26-VERIFY-DATES", "code": "CO-26", "standard_notes": "STATUS: Denied CO-26. Policy effective date is [EffDate], DOS was [DOS]. Contacted patient for prior coverage details. Bill transferred to patient if no prior coverage."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_26_VERIFY_DATES", "label": "Investigation: Date of Service Precedes Polic...", "type": "investigation_step", "description": "Check payer eligibility portal: What was the effective start date of coverage?; Check if patient had previous active insurance on DOS (e.g., prior employer coverage).", "properties": {"steps": ["Check payer eligibility portal: What was the effective start date of coverage?", "Check if patient had previous active insurance on DOS (e.g., prior employer coverage)."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_26_VERIFY_DATES", "label": "Call Script: Date of Service Precedes Polic...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Can you verify the policy effective date for member #[MemberID]?", "question_2": "Was there any retroactive enrollment or grace period covering DOS [DOS]?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_26_VERIFY_DATES", "label": "Form: Eligibility Verification Sheet", "type": "form_requirement", "description": "Box: Box 11a (Insured's DOB/Gender) / Box 12", "properties": {"form_name": "Eligibility Verification Sheet", "box_number": "Box 11a (Insured's DOB/Gender) / Box 12", "required_documents": ["Prior Insurance Card Copy", "Patient Financial Responsibility Waiver"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_26_VERIFY_DATES", "label": "Action Plan: Date of Service Precedes Polic...", "type": "action_plan", "description": "2 step resolution playbook", "properties": {"steps": ["Step 1: If patient had prior active insurance, obtain card details and bill the prior carrier.", "Step 2: If no active insurance existed on DOS, transfer balance to patient responsibility with itemized statement."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_27", "label": "CO-27: Coverage Terminated Prior to Service", "type": "denial_code", "description": "Expenses incurred after coverage terminated.", "properties": {"code": "CO-27", "category_id": "CAT_ELIGIBILITY"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_27_TERM_CHECK", "label": "Patient Policy Terminated Prior to Date of Service", "type": "scenario", "description": "Patient changed jobs, aged off parent plan, or failed to pay premium resulting in policy termination.", "properties": {"raw_id": "CO-27-TERM-CHECK", "code": "CO-27", "standard_notes": "STATUS: Denied CO-27. Policy terminated on [TermDate]. Reached out to patient for updated insurance information. Placed in self-pay queue if no coverage provided."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_27_TERM_CHECK", "label": "Investigation: Patient Policy Terminated Prio...", "type": "investigation_step", "description": "Check payer portal: What is the exact termination date?; Check if patient enrolled in COBRA, Medicaid, or new commercial insurance on DOS.", "properties": {"steps": ["Check payer portal: What is the exact termination date?", "Check if patient enrolled in COBRA, Medicaid, or new commercial insurance on DOS."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_27_TERM_CHECK", "label": "Call Script: Patient Policy Terminated Prio...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Can you confirm the policy termination date for member #[MemberID]?", "question_2": "Is there any COBRA coverage pending or new group policy on record?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_27_TERM_CHECK", "label": "Form: Patient Statement", "type": "form_requirement", "description": "Box: N/A", "properties": {"form_name": "Patient Statement", "box_number": "N/A", "required_documents": ["New Insurance Card", "COBRA Election Notice"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_27_TERM_CHECK", "label": "Action Plan: Patient Policy Terminated Prio...", "type": "action_plan", "description": "3 step resolution playbook", "properties": {"steps": ["Step 1: Contact patient to request new insurance card or COBRA verification.", "Step 2: If new insurance provided, bill new carrier with clean claim.", "Step 3: If no coverage active on DOS, convert claim to Self-Pay and issue patient statement."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_50", "label": "CO-50: Not Deemed Medically Necessary", "type": "denial_code", "description": "These are non-covered services because this is not deemed a 'medical necessity' by the payer.", "properties": {"code": "CO-50", "category_id": "CAT_MEDICAL_NECESSITY"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_50_LCD_NCD_APPEAL", "label": "Medical Necessity Dispute Citing LCD/NCD Coverage Policies", "type": "scenario", "description": "Billed diagnosis code is not covered under the payer's Local Coverage Determination (LCD) or clinical policy bulletin.", "properties": {"raw_id": "CO-50-LCD-NCD-APPEAL", "code": "CO-50", "standard_notes": "STATUS: Denied CO-50 medical necessity. Reviewed chart notes and LCD guidelines. Drafted clinical appeal packet with physician letter of necessity and clinical notes. Submitted to payer appeals dept."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_50_LCD_NCD_APPEAL", "label": "Investigation: Medical Necessity Dispute Citi...", "type": "investigation_step", "description": "Search CMS Medicare Coverage Database or payer policy bulletin for CPT and allowable ICD-10 codes.; Review physician encounter notes: Did patient exhibit qualifying symptoms/diagnoses that were omitted?", "properties": {"steps": ["Search CMS Medicare Coverage Database or payer policy bulletin for CPT and allowable ICD-10 codes.", "Review physician encounter notes: Did patient exhibit qualifying symptoms/diagnoses that were omitted?"]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_50_LCD_NCD_APPEAL", "label": "Call Script: Medical Necessity Dispute Citi...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Which specific Clinical Policy Bulletin or LCD was applied to deny this service?", "question_2": "What is the deadline and fax number for physician peer-to-peer review or formal clinical appeal?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_50_LCD_NCD_APPEAL", "label": "Form: Formal Clinical Appeal Packet", "type": "form_requirement", "description": "Box: Box 21 (Diagnosis Codes)", "properties": {"form_name": "Formal Clinical Appeal Packet", "box_number": "Box 21 (Diagnosis Codes)", "required_documents": ["Letter of Medical Necessity signed by Physician", "Complete Clinical Chart Notes & Diagnostic Lab/Imaging Reports", "Copy of Relevant LCD / Clinical Policy Bulletin"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_50_LCD_NCD_APPEAL", "label": "Action Plan: Medical Necessity Dispute Citi...", "type": "action_plan", "description": "4 step resolution playbook", "properties": {"steps": ["Step 1: Review clinical notes to determine if a secondary covered diagnosis code was documented but unbilled.", "Step 2: If unbilled covered diagnosis exists in chart, submit corrected claim.", "Step 3: If coding was accurate, generate clinical appeal citing physician rationale and peer-reviewed guidelines.", "Step 4: Offer attending physician the option for peer-to-peer review with payer medical director."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_97", "label": "CO-97: Bundled / Inclusive Service (NCCI Edit)", "type": "denial_code", "description": "The benefit for this service is included in the payment/allowance for another service/procedure that has already been adjudicated.", "properties": {"code": "CO-97", "category_id": "CAT_DUPLICATE_BUNDLING"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_97_UNBUNDLING_MOD_59", "label": "Separate Procedure Eligible for Modifier 59 / X(EPSU)", "type": "scenario", "description": "Procedure bundled under NCCI PTP (Procedure-to-Procedure) edits, but was performed at a distinct anatomical site or session.", "properties": {"raw_id": "CO-97-UNBUNDLING-MOD-59", "code": "CO-97", "standard_notes": "STATUS: Denied CO-97 bundled service. NCCI indicator allows modifier. Documentation confirms separate site. Appended Modifier 59 in Box 24D and resubmitted corrected claim."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_97_UNBUNDLING_MOD_59", "label": "Investigation: Separate Procedure Eligible fo...", "type": "investigation_step", "description": "Check NCCI edit table: Is the edit modifier indicator '1' (modifier permitted)?; Verify chart: Did procedure occur at a separate lesion, distinct incision, or separate encounter?", "properties": {"steps": ["Check NCCI edit table: Is the edit modifier indicator '1' (modifier permitted)?", "Verify chart: Did procedure occur at a separate lesion, distinct incision, or separate encounter?"]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_97_UNBUNDLING_MOD_59", "label": "Call Script: Separate Procedure Eligible fo...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Is this code bundled with CPT [PrimaryCPT] under CMS NCCI edits?", "question_2": "If supported by chart notes as a distinct site, will appending Modifier 59/XS allow unbundling?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_97_UNBUNDLING_MOD_59", "label": "Form: CMS-1500", "type": "form_requirement", "description": "Box: Box 24D (Modifier Column)", "properties": {"form_name": "CMS-1500", "box_number": "Box 24D (Modifier Column)", "required_documents": ["Operative Report with distinct site highlighted"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_97_UNBUNDLING_MOD_59", "label": "Action Plan: Separate Procedure Eligible fo...", "type": "action_plan", "description": "3 step resolution playbook", "properties": {"steps": ["Step 1: Verify NCCI indicator allows modifier (Modifier indicator 1).", "Step 2: Append Modifier 59 or specific X-modifier (XE, XS, XP, XU) to secondary procedure.", "Step 3: Submit corrected claim with frequency code 7."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_45", "label": "CO-45: Contractual Fee Schedule Adjustment", "type": "denial_code", "description": "Charge exceeds fee schedule/maximum allowable or contracted/legislated fee arrangement.", "properties": {"code": "CO-45", "category_id": "CAT_DUPLICATE_BUNDLING"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_45_CONTRACTUAL_ADJUSTMENT", "label": "Normal In-Network Contractual Write-Off", "type": "scenario", "description": "The difference between provider billed charge and payer negotiated allowable fee.", "properties": {"raw_id": "CO-45-CONTRACTUAL-ADJUSTMENT", "code": "CO-45", "standard_notes": "STATUS: Processed CO-45. Standard contractual adjustment verified against fee schedule. Posted adjustment to ledger. Patient balance adjusted."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_45_CONTRACTUAL_ADJUSTMENT", "label": "Investigation: Normal In-Network Contractual ...", "type": "investigation_step", "description": "Compare payment received + patient copay/coinsurance against fee schedule.; Verify that the contractual allowance matches provider in-network fee agreement.", "properties": {"steps": ["Compare payment received + patient copay/coinsurance against fee schedule.", "Verify that the contractual allowance matches provider in-network fee agreement."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_45_CONTRACTUAL_ADJUSTMENT", "label": "Call Script: Normal In-Network Contractual ...", "type": "payer_question", "description": "1 phone inquiry questions", "properties": {"question_1": "Can you verify if allowable calculation is based on standard in-network fee schedule?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_45_CONTRACTUAL_ADJUSTMENT", "label": "Form: Remittance Advice ERA Posting", "type": "form_requirement", "description": "Box: N/A", "properties": {"form_name": "Remittance Advice ERA Posting", "box_number": "N/A", "required_documents": ["ERA / 835 Remittance File"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_45_CONTRACTUAL_ADJUSTMENT", "label": "Action Plan: Normal In-Network Contractual ...", "type": "action_plan", "description": "2 step resolution playbook", "properties": {"steps": ["Step 1: Post the CO-45 amount as a contractual adjustment in the billing system.", "Step 2: Ensure the adjusted amount is NOT billed to the patient (protected under in-network contract)."]}, "radius": 14, "color": "#2dd4bf"}, {"id": "CODE_CO_31", "label": "CO-31: Patient Cannot Be Identified", "type": "denial_code", "description": "Patient cannot be identified as our insured.", "properties": {"code": "CO-31", "category_id": "CAT_ELIGIBILITY"}, "radius": 24, "color": "#60a5fa"}, {"id": "SCENARIO_CO_31_ID_MISMATCH", "label": "Typo in Member ID, Name, or Date of Birth", "type": "scenario", "description": "Member ID missing alpha prefix, typo in policy number, or mismatch in patient legal name / DOB.", "properties": {"raw_id": "CO-31-ID-MISMATCH", "code": "CO-31", "standard_notes": "STATUS: Denied CO-31. Identified typo in Member ID (missing alpha prefix). Corrected Box 1a with [CorrectedID]. Claim resubmitted."}, "radius": 18, "color": "#34d399"}, {"id": "INV_CO_31_ID_MISMATCH", "label": "Investigation: Typo in Member ID, Name, or Da...", "type": "investigation_step", "description": "Check physical copy of insurance card in EHR.; Compare Cardholder ID, Group #, and Patient DOB against claim Box 1a, Box 2, Box 3.", "properties": {"steps": ["Check physical copy of insurance card in EHR.", "Compare Cardholder ID, Group #, and Patient DOB against claim Box 1a, Box 2, Box 3."]}, "radius": 12, "color": "#fb923c"}, {"id": "CALL_CO_31_ID_MISMATCH", "label": "Call Script: Typo in Member ID, Name, or Da...", "type": "payer_question", "description": "2 phone inquiry questions", "properties": {"question_1": "Can you search for the member using their SSN, DOB, and legal name?", "question_2": "Is there an active alpha prefix or suffix required for member ID [MemberID]?"}, "radius": 12, "color": "#f472b6"}, {"id": "FORM_CO_31_ID_MISMATCH", "label": "Form: CMS-1500", "type": "form_requirement", "description": "Box: Box 1a (Insured's ID), Box 2 (Patient Name), Box 3 (DOB)", "properties": {"form_name": "CMS-1500", "box_number": "Box 1a (Insured's ID), Box 2 (Patient Name), Box 3 (DOB)", "required_documents": ["Front & Back Insurance Card Copy"]}, "radius": 14, "color": "#c084fc"}, {"id": "ACT_CO_31_ID_MISMATCH", "label": "Action Plan: Typo in Member ID, Name, or Da...", "type": "action_plan", "description": "3 step resolution playbook", "properties": {"steps": ["Step 1: Verify correct member ID format with payer or patient.", "Step 2: Update patient master file in billing system.", "Step 3: Resubmit clean corrected claim."]}, "radius": 14, "color": "#2dd4bf"}], "links": [{"source": "CAT_MISSING_INFO", "target": "CODE_CO_16", "relation": "INCLUDES", "description": "Category includes CO-16", "properties": {}}, {"source": "CODE_CO_16", "target": "SCENARIO_CO_16_OP_NOTE", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_16_OP_NOTE", "target": "INV_CO_16_OP_NOTE", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_16_OP_NOTE", "target": "CALL_CO_16_OP_NOTE", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_16_OP_NOTE", "target": "FORM_CO_16_OP_NOTE", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_16_OP_NOTE", "target": "ACT_CO_16_OP_NOTE", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CODE_CO_16", "target": "SCENARIO_CO_16_MOD_25", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_16_MOD_25", "target": "INV_CO_16_MOD_25", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_16_MOD_25", "target": "CALL_CO_16_MOD_25", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_16_MOD_25", "target": "FORM_CO_16_MOD_25", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_16_MOD_25", "target": "ACT_CO_16_MOD_25", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CODE_CO_16", "target": "SCENARIO_CO_16_TAXONOMY_NPI", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_16_TAXONOMY_NPI", "target": "INV_CO_16_TAXONOMY_NPI", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_16_TAXONOMY_NPI", "target": "CALL_CO_16_TAXONOMY_NPI", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_16_TAXONOMY_NPI", "target": "FORM_CO_16_TAXONOMY_NPI", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_16_TAXONOMY_NPI", "target": "ACT_CO_16_TAXONOMY_NPI", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_PRIOR_AUTH", "target": "CODE_CO_197", "relation": "INCLUDES", "description": "Category includes CO-197", "properties": {}}, {"source": "CODE_CO_197", "target": "SCENARIO_CO_197_AUTH_ON_FILE", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_197_AUTH_ON_FILE", "target": "INV_CO_197_AUTH_ON_FILE", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_197_AUTH_ON_FILE", "target": "CALL_CO_197_AUTH_ON_FILE", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_197_AUTH_ON_FILE", "target": "FORM_CO_197_AUTH_ON_FILE", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_197_AUTH_ON_FILE", "target": "ACT_CO_197_AUTH_ON_FILE", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CODE_CO_197", "target": "SCENARIO_CO_197_RETRO_AUTH", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_197_RETRO_AUTH", "target": "INV_CO_197_RETRO_AUTH", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_197_RETRO_AUTH", "target": "CALL_CO_197_RETRO_AUTH", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_197_RETRO_AUTH", "target": "FORM_CO_197_RETRO_AUTH", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_197_RETRO_AUTH", "target": "ACT_CO_197_RETRO_AUTH", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_TIMELY_FILING", "target": "CODE_CO_29", "relation": "INCLUDES", "description": "Category includes CO-29", "properties": {}}, {"source": "CODE_CO_29", "target": "SCENARIO_CO_29_PROOF_AVAILABLE", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_29_PROOF_AVAILABLE", "target": "INV_CO_29_PROOF_AVAILABLE", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_29_PROOF_AVAILABLE", "target": "CALL_CO_29_PROOF_AVAILABLE", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_29_PROOF_AVAILABLE", "target": "FORM_CO_29_PROOF_AVAILABLE", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_29_PROOF_AVAILABLE", "target": "ACT_CO_29_PROOF_AVAILABLE", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CODE_CO_29", "target": "SCENARIO_CO_29_NO_PROOF", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_29_NO_PROOF", "target": "INV_CO_29_NO_PROOF", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_29_NO_PROOF", "target": "CALL_CO_29_NO_PROOF", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_29_NO_PROOF", "target": "FORM_CO_29_NO_PROOF", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_29_NO_PROOF", "target": "ACT_CO_29_NO_PROOF", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_COB", "target": "CODE_CO_22", "relation": "INCLUDES", "description": "Category includes CO-22", "properties": {}}, {"source": "CODE_CO_22", "target": "SCENARIO_CO_22_PATIENT_UPDATE", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_22_PATIENT_UPDATE", "target": "INV_CO_22_PATIENT_UPDATE", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_22_PATIENT_UPDATE", "target": "CALL_CO_22_PATIENT_UPDATE", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_22_PATIENT_UPDATE", "target": "FORM_CO_22_PATIENT_UPDATE", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_22_PATIENT_UPDATE", "target": "ACT_CO_22_PATIENT_UPDATE", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CODE_CO_22", "target": "SCENARIO_CO_22_PRIMARY_DISPUTE", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_22_PRIMARY_DISPUTE", "target": "INV_CO_22_PRIMARY_DISPUTE", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_22_PRIMARY_DISPUTE", "target": "CALL_CO_22_PRIMARY_DISPUTE", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_22_PRIMARY_DISPUTE", "target": "FORM_CO_22_PRIMARY_DISPUTE", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_22_PRIMARY_DISPUTE", "target": "ACT_CO_22_PRIMARY_DISPUTE", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_CODING_MODIFIERS", "target": "CODE_CO_4", "relation": "INCLUDES", "description": "Category includes CO-4", "properties": {}}, {"source": "CODE_CO_4", "target": "SCENARIO_CO_4_ANATOMICAL", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_4_ANATOMICAL", "target": "INV_CO_4_ANATOMICAL", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_4_ANATOMICAL", "target": "CALL_CO_4_ANATOMICAL", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_4_ANATOMICAL", "target": "FORM_CO_4_ANATOMICAL", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_4_ANATOMICAL", "target": "ACT_CO_4_ANATOMICAL", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_DUPLICATE_BUNDLING", "target": "CODE_CO_18", "relation": "INCLUDES", "description": "Category includes CO-18", "properties": {}}, {"source": "CODE_CO_18", "target": "SCENARIO_CO_18_ALREADY_PAID", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_18_ALREADY_PAID", "target": "INV_CO_18_ALREADY_PAID", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_18_ALREADY_PAID", "target": "CALL_CO_18_ALREADY_PAID", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_18_ALREADY_PAID", "target": "FORM_CO_18_ALREADY_PAID", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_18_ALREADY_PAID", "target": "ACT_CO_18_ALREADY_PAID", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CODE_CO_18", "target": "SCENARIO_CO_18_REPEAT_PROCEDURE", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_18_REPEAT_PROCEDURE", "target": "INV_CO_18_REPEAT_PROCEDURE", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_18_REPEAT_PROCEDURE", "target": "CALL_CO_18_REPEAT_PROCEDURE", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_18_REPEAT_PROCEDURE", "target": "FORM_CO_18_REPEAT_PROCEDURE", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_18_REPEAT_PROCEDURE", "target": "ACT_CO_18_REPEAT_PROCEDURE", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_ELIGIBILITY", "target": "CODE_CO_26", "relation": "INCLUDES", "description": "Category includes CO-26", "properties": {}}, {"source": "CODE_CO_26", "target": "SCENARIO_CO_26_VERIFY_DATES", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_26_VERIFY_DATES", "target": "INV_CO_26_VERIFY_DATES", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_26_VERIFY_DATES", "target": "CALL_CO_26_VERIFY_DATES", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_26_VERIFY_DATES", "target": "FORM_CO_26_VERIFY_DATES", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_26_VERIFY_DATES", "target": "ACT_CO_26_VERIFY_DATES", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_ELIGIBILITY", "target": "CODE_CO_27", "relation": "INCLUDES", "description": "Category includes CO-27", "properties": {}}, {"source": "CODE_CO_27", "target": "SCENARIO_CO_27_TERM_CHECK", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_27_TERM_CHECK", "target": "INV_CO_27_TERM_CHECK", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_27_TERM_CHECK", "target": "CALL_CO_27_TERM_CHECK", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_27_TERM_CHECK", "target": "FORM_CO_27_TERM_CHECK", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_27_TERM_CHECK", "target": "ACT_CO_27_TERM_CHECK", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_MEDICAL_NECESSITY", "target": "CODE_CO_50", "relation": "INCLUDES", "description": "Category includes CO-50", "properties": {}}, {"source": "CODE_CO_50", "target": "SCENARIO_CO_50_LCD_NCD_APPEAL", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_50_LCD_NCD_APPEAL", "target": "INV_CO_50_LCD_NCD_APPEAL", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_50_LCD_NCD_APPEAL", "target": "CALL_CO_50_LCD_NCD_APPEAL", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_50_LCD_NCD_APPEAL", "target": "FORM_CO_50_LCD_NCD_APPEAL", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_50_LCD_NCD_APPEAL", "target": "ACT_CO_50_LCD_NCD_APPEAL", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_DUPLICATE_BUNDLING", "target": "CODE_CO_97", "relation": "INCLUDES", "description": "Category includes CO-97", "properties": {}}, {"source": "CODE_CO_97", "target": "SCENARIO_CO_97_UNBUNDLING_MOD_59", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_97_UNBUNDLING_MOD_59", "target": "INV_CO_97_UNBUNDLING_MOD_59", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_97_UNBUNDLING_MOD_59", "target": "CALL_CO_97_UNBUNDLING_MOD_59", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_97_UNBUNDLING_MOD_59", "target": "FORM_CO_97_UNBUNDLING_MOD_59", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_97_UNBUNDLING_MOD_59", "target": "ACT_CO_97_UNBUNDLING_MOD_59", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_DUPLICATE_BUNDLING", "target": "CODE_CO_45", "relation": "INCLUDES", "description": "Category includes CO-45", "properties": {}}, {"source": "CODE_CO_45", "target": "SCENARIO_CO_45_CONTRACTUAL_ADJUSTMENT", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_45_CONTRACTUAL_ADJUSTMENT", "target": "INV_CO_45_CONTRACTUAL_ADJUSTMENT", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_45_CONTRACTUAL_ADJUSTMENT", "target": "CALL_CO_45_CONTRACTUAL_ADJUSTMENT", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_45_CONTRACTUAL_ADJUSTMENT", "target": "FORM_CO_45_CONTRACTUAL_ADJUSTMENT", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_45_CONTRACTUAL_ADJUSTMENT", "target": "ACT_CO_45_CONTRACTUAL_ADJUSTMENT", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}, {"source": "CAT_ELIGIBILITY", "target": "CODE_CO_31", "relation": "INCLUDES", "description": "Category includes CO-31", "properties": {}}, {"source": "CODE_CO_31", "target": "SCENARIO_CO_31_ID_MISMATCH", "relation": "MANIFESTS_AS", "description": "Denial manifests in scenario", "properties": {}}, {"source": "SCENARIO_CO_31_ID_MISMATCH", "target": "INV_CO_31_ID_MISMATCH", "relation": "REQUIRES_CHECK", "description": "Requires clinical/billing checks", "properties": {}}, {"source": "SCENARIO_CO_31_ID_MISMATCH", "target": "CALL_CO_31_ID_MISMATCH", "relation": "CALL_SCRIPT", "description": "Questions to ask payer representative", "properties": {}}, {"source": "SCENARIO_CO_31_ID_MISMATCH", "target": "FORM_CO_31_ID_MISMATCH", "relation": "REQUIRES_FORM", "description": "Specific form & box correction needed", "properties": {}}, {"source": "SCENARIO_CO_31_ID_MISMATCH", "target": "ACT_CO_31_ID_MISMATCH", "relation": "RESOLVED_BY", "description": "Step-by-step resolution playbook", "properties": {}}], "categories": [{"id": "CAT_MISSING_INFO", "name": "Missing Information & Documentation", "description": "Claims denied due to absent clinical documentation, invoices, missing modifiers, or incomplete claim form fields.", "color": "#3b82f6"}, {"id": "CAT_PRIOR_AUTH", "name": "Prior Authorization & Referrals", "description": "Denials related to lack of pre-certification, missing referral numbers, authorization validity date mismatches, or retro-auths.", "color": "#8b5cf6"}, {"id": "CAT_TIMELY_FILING", "name": "Timely Filing & Deadlines", "description": "Denials where submission exceeded payer timely filing limits, requiring proof of timely filing or contractual write-off.", "color": "#ef4444"}, {"id": "CAT_COB", "name": "Coordination of Benefits & Third Party Liability", "description": "Cross-payer disputes, primary vs secondary coverage, Medicare Secondary Payer (MSP), or patient COB update requirements.", "color": "#f59e0b"}, {"id": "CAT_MEDICAL_NECESSITY", "name": "Medical Necessity & Level of Service", "description": "Clinical denials where service was deemed non-covered, experimental, or downcoded, requiring physician appeals or peer-to-peer reviews.", "color": "#10b981"}, {"id": "CAT_CODING_MODIFIERS", "name": "Coding, Inconsistencies & Modifier Edits", "description": "Inconsistencies between diagnosis and procedure, patient age/gender mismatches, missing/invalid modifiers, or provider specialty rules.", "color": "#06b6d4"}, {"id": "CAT_DUPLICATE_BUNDLING", "name": "Duplicate, Bundling & NCCI Edits", "description": "Exact duplicate claims, services included in payment for another procedure (inclusive/bundled), or global period violations.", "color": "#ec4899"}, {"id": "CAT_ELIGIBILITY", "name": "Eligibility, Identification & Termination", "description": "Patient not identified, expenses incurred prior to/after coverage dates, incorrect member ID, or demographic mismatches.", "color": "#6366f1"}]};
+
+    const canvas = document.getElementById('graph-canvas');
+    const ctx = canvas.getContext('2d');
+    let width = canvas.width = canvas.parentElement.clientWidth;
+    let height = canvas.height = canvas.parentElement.clientHeight;
+
+    window.addEventListener('resize', function() {
+      width = canvas.width = canvas.parentElement.clientWidth;
+      height = canvas.height = canvas.parentElement.clientHeight;
+    });
+
+    const nodes = graphData.nodes.map(function(n, i) {
+      const angle = (i / graphData.nodes.length) * Math.PI * 2;
+      const dist = (n.radius || 15) * 8 + Math.random() * 80;
+      return Object.assign({}, n, {
+        x: width / 2 + Math.cos(angle) * dist + (Math.random() - 0.5) * 60,
+        y: height / 2 + Math.sin(angle) * dist + (Math.random() - 0.5) * 60,
+        vx: 0,
+        vy: 0,
+        radius: n.radius || 15,
+        color: n.color || '#3b82f6'
+      });
+    });
+
+    const nodeMap = new Map();
+    nodes.forEach(function(n) { nodeMap.set(n.id, n); });
+
+    const links = graphData.links.map(function(l) {
+      return Object.assign({}, l, {
+        sourceNode: nodeMap.get(l.source),
+        targetNode: nodeMap.get(l.target)
+      });
+    }).filter(function(l) { return l.sourceNode && l.targetNode; });
+
+    let transform = { x: 0, y: 0, scale: 0.9 };
+    let isDraggingCanvas = false;
+    let draggedNode = null;
+    let startPan = { x: 0, y: 0 };
+    let hoveredNode = null;
+    let selectedNode = null;
+    let filterQuery = '';
+
+    canvas.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
+      transform.scale = Math.max(0.2, Math.min(3.5, transform.scale * zoomFactor));
+    });
+
+    canvas.addEventListener('mousedown', function(e) {
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = (e.clientX - rect.left - width / 2 - transform.x) / transform.scale + width / 2;
+      const mouseY = (e.clientY - rect.top - height / 2 - transform.y) / transform.scale + height / 2;
+
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        const dx = mouseX - n.x;
+        const dy = mouseY - n.y;
+        if (dx * dx + dy * dy < n.radius * n.radius) {
+          draggedNode = n;
+          selectedNode = n;
+          displayNodeDetails(n);
+          return;
+        }
+      }
+
+      isDraggingCanvas = true;
+      startPan = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+    });
+
+    window.addEventListener('mousemove', function(e) {
+      if (draggedNode) {
+        const rect = canvas.getBoundingClientRect();
+        draggedNode.x = (e.clientX - rect.left - width / 2 - transform.x) / transform.scale + width / 2;
+        draggedNode.y = (e.clientY - rect.top - height / 2 - transform.y) / transform.scale + height / 2;
+        draggedNode.vx = 0;
+        draggedNode.vy = 0;
+      } else if (isDraggingCanvas) {
+        transform.x = e.clientX - startPan.x;
+        transform.y = e.clientY - startPan.y;
+      } else {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = (e.clientX - rect.left - width / 2 - transform.x) / transform.scale + width / 2;
+        const mouseY = (e.clientY - rect.top - height / 2 - transform.y) / transform.scale + height / 2;
+        hoveredNode = null;
+        for (let i = nodes.length - 1; i >= 0; i--) {
+          const n = nodes[i];
+          const dx = mouseX - n.x;
+          const dy = mouseY - n.y;
+          if (dx * dx + dy * dy < n.radius * n.radius) {
+            hoveredNode = n;
+            break;
+          }
+        }
+      }
+    });
+
+    window.addEventListener('mouseup', function() {
+      draggedNode = null;
+      isDraggingCanvas = false;
+    });
+
+    const searchBox = document.getElementById('search-box');
+    searchBox.addEventListener('input', function(e) {
+      filterQuery = e.target.value.toLowerCase().trim();
+      if (filterQuery) {
+        const match = nodes.find(function(n) {
+          return n.label.toLowerCase().indexOf(filterQuery) !== -1 || (n.description && n.description.toLowerCase().indexOf(filterQuery) !== -1);
+        });
+        if (match) {
+          transform.x = -(match.x - width / 2) * transform.scale;
+          transform.y = -(match.y - height / 2) * transform.scale;
+          selectedNode = match;
+          displayNodeDetails(match);
+        }
+      }
+    });
+
+    function simulate() {
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i];
+          const b = nodes[j];
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const minDist = (a.radius + b.radius) * 2.2;
+          if (dist < minDist) {
+            const force = (minDist - dist) / dist * 0.4;
+            const fx = dx * force;
+            const fy = dy * force;
+            a.vx -= fx;
+            a.vy -= fy;
+            b.vx += fx;
+            b.vy += fy;
+          }
+        }
+      }
+
+      links.forEach(function(l) {
+        const a = l.sourceNode;
+        const b = l.targetNode;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const targetDist = 65 + (a.radius + b.radius);
+        const force = (dist - targetDist) * 0.02;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        a.vx += fx;
+        a.vy += fy;
+        b.vx -= fx;
+        b.vy -= fy;
+      });
+
+      nodes.forEach(function(n) {
+        if (n === draggedNode) return;
+        const cdx = width / 2 - n.x;
+        const cdy = height / 2 - n.y;
+        n.vx += cdx * 0.001;
+        n.vy += cdy * 0.001;
+        n.x += n.vx;
+        n.y += n.vy;
+        n.vx *= 0.84;
+        n.vy *= 0.84;
+      });
+    }
+
+    function draw() {
+      simulate();
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.save();
+      ctx.translate(width / 2 + transform.x, height / 2 + transform.y);
+      ctx.scale(transform.scale, transform.scale);
+      ctx.translate(-width / 2, -height / 2);
+
+      links.forEach(function(l) {
+        const isHighlighted = selectedNode && (l.sourceNode === selectedNode || l.targetNode === selectedNode);
+        ctx.beginPath();
+        ctx.moveTo(l.sourceNode.x, l.sourceNode.y);
+        ctx.lineTo(l.targetNode.x, l.targetNode.y);
+        ctx.strokeStyle = isHighlighted ? 'rgba(96, 165, 250, 0.7)' : 'rgba(148, 163, 184, 0.15)';
+        ctx.lineWidth = isHighlighted ? 2.5 : 1;
+        ctx.stroke();
+      });
+
+      nodes.forEach(function(n) {
+        const isSelected = n === selectedNode;
+        const isHovered = n === hoveredNode;
+        const isMatch = filterQuery && (n.label.toLowerCase().indexOf(filterQuery) !== -1 || (n.description && n.description.toLowerCase().indexOf(filterQuery) !== -1));
+
+        if (isSelected || isHovered || isMatch) {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, n.radius + 8, 0, Math.PI * 2);
+          ctx.fillStyle = 'rgba(59, 130, 246, 0.25)';
+          ctx.fill();
+        }
+
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.radius, 0, Math.PI * 2);
+        ctx.fillStyle = n.color;
+        ctx.shadowColor = n.color;
+        ctx.shadowBlur = isSelected ? 22 : 8;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+
+        ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255, 255, 255, 0.35)';
+        ctx.lineWidth = isSelected ? 2.5 : 1;
+        ctx.stroke();
+
+        if (n.radius >= 16 || isSelected || isHovered || isMatch) {
+          ctx.font = Math.max(11, n.radius * 0.65) + 'px -apple-system, sans-serif';
+          ctx.fillStyle = '#f8fafc';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          const shortLabel = n.label.length > 24 ? n.label.slice(0, 22) + '...' : n.label;
+          ctx.fillText(shortLabel, n.x, n.y + n.radius + 12);
+        }
+      });
+
+      ctx.restore();
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+
+    function displayNodeDetails(node) {
+      const badge = document.getElementById('badge-type');
+      const title = document.getElementById('node-title');
+      const desc = document.getElementById('node-desc');
+      const container = document.getElementById('dynamic-sections');
+
+      badge.textContent = node.type.replace('_', ' ');
+      badge.style.background = node.color;
+      badge.style.color = '#fff';
+      title.textContent = node.label;
+      desc.textContent = node.description || 'Knowledge graph entity node.';
+
+      let html = '';
+
+      if (node.type === 'denial_code') {
+        const codeKey = node.properties.code || node.label.split(':')[0].trim();
+        const connectedScenarios = nodes.filter(function(n) {
+          return n.type === 'scenario' && n.properties && n.properties.code === codeKey;
+        });
+        html += '<div class="section-card"><h4><span>📂</span> Associated Operational Scenarios (' + connectedScenarios.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
+        connectedScenarios.forEach(function(s) {
+          html += '<div style="padding: 8px; background: rgba(15,23,42,0.6); border-radius: 4px; font-size: 12px; cursor: pointer; border-left: 2px solid #34d399;" onclick="selectNodeById('' + s.id + '')"><strong>' + s.label + '</strong><div style="font-size: 11px; color: #94a3b8; margin-top: 2px;">' + (s.description || '') + '</div></div>';
+        });
+        html += '</div></div>';
+      }
+
+      if (node.type === 'scenario') {
+        const children = links.filter(function(l) { return l.sourceNode === node; }).map(function(l) { return l.targetNode; });
+        const inv = children.find(function(c) { return c.type === 'investigation_step'; });
+        const form = children.find(function(c) { return c.type === 'form_requirement'; });
+        const script = children.find(function(c) { return c.type === 'payer_question'; });
+        const act = children.find(function(c) { return c.type === 'action_plan'; });
+
+        if (inv && inv.properties && inv.properties.steps) {
+          html += '<div class="section-card"><h4><span>🔍</span> Investigation Checklist</h4>';
+          inv.properties.steps.forEach(function(s) {
+            html += '<div class="checklist-item">' + s + '</div>';
+          });
+          html += '</div>';
+        }
+
+        if (form && form.properties) {
+          html += '<div class="section-card"><h4><span>📋</span> Form & Field Requirements</h4><div style="font-size: 12px; color: #f1f5f9;"><strong>Form:</strong> ' + (form.properties.form_name || 'CMS-1500') + '<br/><strong>Box/Segment:</strong> <span style="color: #c084fc; font-weight: bold;">' + (form.properties.box_number || 'N/A') + '</span></div>';
+          if (form.properties.required_documents) {
+            html += '<div style="margin-top: 6px; font-size: 11px; color: #94a3b8;"><strong>Required Attachments:</strong> ' + form.properties.required_documents.join(', ') + '</div>';
+          }
+          html += '</div>';
+        }
+
+        if (script && script.properties) {
+          html += '<div class="section-card"><h4><span>📞</span> Payer Call Script Questions</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
+          for (let k in script.properties) {
+            html += '<div class="script-item"><strong>' + k.toUpperCase() + ':</strong> "' + script.properties[k] + '"</div>';
+          }
+          html += '</div></div>';
+        }
+
+        if (act && act.properties && act.properties.steps) {
+          html += '<div class="section-card"><h4><span>⚡</span> Step-by-Step Resolution Playbook</h4><div style="display: flex; flex-direction: column; gap: 4px;">';
+          act.properties.steps.forEach(function(s) {
+            html += '<div style="font-size: 12px; color: #a7f3d0;">✓ ' + s + '</div>';
+          });
+          html += '</div></div>';
+        }
+
+        if (node.properties && node.properties.standard_notes) {
+          html += '<div class="section-card"><div style="display: flex; justify-content: space-between; align-items: center;"><h4><span>📝</span> Standard AR Call Notes</h4><button class="copy-btn" onclick="navigator.clipboard.writeText(document.getElementById(\'ar-notes-text\').innerText); this.innerText=\'Copied!\';">Copy Notes</button></div><div class="notes-box" id="ar-notes-text">' + node.properties.standard_notes + '</div></div>';
+        }
+      }
+
+      container.innerHTML = html || '<div class="hint-text">Connected subgraph node. Drag to inspect connections.</div>';
+    }
+
+    window.selectNodeById = function(id) {
+      const target = nodes.find(function(n) { return n.id === id; });
+      if (target) {
+        selectedNode = target;
+        displayNodeDetails(target);
+        transform.x = -(target.x - width / 2) * transform.scale;
+        transform.y = -(target.y - height / 2) * transform.scale;
+      }
+    };
+  </script>
+</body>
+</html>

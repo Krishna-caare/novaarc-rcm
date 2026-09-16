@@ -292,6 +292,89 @@ Defined in: [backend/app/routers/denials.py](file:///b:/Baskar/nova%20arc/backen
   }
   ```
 
+### 4.6 Knowledge Graph Overview
+- **Endpoint**: `GET /denials/knowledge-graph/overview`
+- **Auth**: Protected
+- **Description**: Returns total node counts, edge counts, categorical distribution, and list of configured CARC codes.
+- **Response (200 OK)**:
+  ```json
+  {
+    "total_nodes": 110,
+    "total_edges": 102,
+    "node_type_counts": {
+      "category": 8,
+      "denial_code": 12,
+      "scenario": 18,
+      "investigation_step": 18,
+      "payer_question": 18,
+      "form_requirement": 18,
+      "action_plan": 18
+    },
+    "categories": [...],
+    "carc_codes": ["CO-16", "CO-197", "CO-29", "CO-22", "CO-4", "CO-18", "CO-26", "CO-27", "CO-50", "CO-97", "CO-45", "CO-31"]
+  }
+  ```
+
+### 4.7 Knowledge Graph Code Subgraph
+- **Endpoint**: `GET /denials/knowledge-graph/{code}`
+- **Auth**: Protected
+- **Description**: Extracts the connected subgraph for a specific CARC code (e.g. `CO-16`, `CO-197`, `CO-29`), returning all operational scenarios, investigation checklists, CMS-1500 box mappings, and resolution steps.
+- **Response (200 OK)**:
+  ```json
+  {
+    "code": "CO-16",
+    "code_description": "Claim/service lacks information or has submission/billing error(s).",
+    "category": "CAT_MISSING_INFO",
+    "scenarios": [
+      {
+        "id": "CO-16-OP-NOTE",
+        "title": "Missing Operative Report / Surgical Notes",
+        "root_cause": "Payer requested signed operative report...",
+        "investigation_steps": ["Check EHR for signed operative note..."],
+        "call_script": { "question_1": "May I know the exact denial date..." },
+        "form_requirements": { "form_name": "CMS-1500", "box_number": "PWK Segment" },
+        "action_plan": ["Step 1: Pull signed note", "Step 2: Fax with cover sheet..."]
+      }
+    ],
+    "nodes": [...],
+    "edges": [...]
+  }
+  ```
+
+### 4.8 GraphRAG Denial Recommendation
+- **Endpoint**: `POST /denials/{denial_id}/rag-recommendation`
+- **Auth**: Protected
+- **Description**: Executes the Hybrid GraphRAG pipeline on a specific denial in the database. Traverses the Knowledge Graph, diagnoses the exact operational scenario, and synthesizes a step-by-step resolution playbook and pre-formatted standard AR call notes.
+- **Response (200 OK)**:
+  ```json
+  {
+    "scenario_id": "CO-16-OP-NOTE",
+    "scenario_title": "Missing Operative Report / Surgical Notes",
+    "root_cause_analysis": "Payer requested signed operative or procedure report to substantiate surgical CPT code.",
+    "investigation_checklist": [
+      "Check EHR: Is the operative note dictated, finalized, and electronically signed by the surgeon?",
+      "Verify if the operative note has already been transmitted via clearinghouse attachment or fax."
+    ],
+    "payer_call_script": {
+      "question_1": "May I know the exact denial date and the specific documents requested?",
+      "question_2": "What is the dedicated fax number to send the operative report?"
+    },
+    "form_requirements": {
+      "form_name": "CMS-1500 / EDI 275 Attachment",
+      "box_number": "PWK Segment (EDI 837) / Attachment Control Number in Box 19",
+      "required_documents": ["Signed Operative Report", "Claim Cover Sheet"]
+    },
+    "resolution_action_plan": [
+      "Step 1: Pull the signed operative note and clinical record from EHR.",
+      "Step 2: Check time limit. If within deadline, fax documents to payer.",
+      "Step 3: Document the fax transmission receipt.",
+      "Step 4: Set follow-up task for 21-30 days."
+    ],
+    "standard_ar_notes": "CALL STATUS: Claim denied CO-16 for Operative Report. Spoke with Rep: Claims Rep | Call Ref#: REF-101. Verified fax#: 800-555-0199. Sent signed operative report via fax. Next follow-up: 21 days.",
+    "confidence": 0.95
+  }
+  ```
+
 ---
 
 ## 5. Payments API (`/payments`)
@@ -586,6 +669,16 @@ Defined in: [backend/app/routers/assistant.py](file:///b:/Baskar/nova%20arc/back
 - `assign_claim_to_queue(db, claim_id) -> ClaimQueueAssignment`: Triage engine evaluating claim age, denial status, and denial prediction risk, routing the claim to the appropriate work queue.
 - `determine_queue(db, claim) -> WorkQueue | None`: Evaluates priority rules across the 7 queue types.
 - `reassign_claim(db, claim_id, queue_id) -> ClaimQueueAssignment`: Closes current assignment and creates a new queue assignment.
+
+### `app.knowledge_graph.graph_engine`
+- `denial_kg.get_overview() -> dict`: Returns overall graph statistics (total nodes, edges, category distribution, CARC codes).
+- `denial_kg.get_subgraph(code_or_query: str) -> SubgraphResult`: Extracts the connected subgraph for a specific CARC code (scenarios, investigation checklist, form boxes, call script, action plan).
+- `denial_kg.search_scenarios(query: str, category_id: str = None) -> list[dict]`: Full-text/keyword search across scenarios, root causes, actions, and form requirements.
+- `denial_kg.to_d3_graph() -> dict`: Formats the entire knowledge graph into Canvas/D3 force-directed physics nodes and links for visualization.
+
+### `app.services.denial_rag`
+- `run_denial_rag(claim_context: dict) -> dict`: Executes the Hybrid GraphRAG pipeline on a denied claim. Matches the most specific scenario from the Knowledge Graph, prompts the clinical LLM (or deterministic rules), and synthesizes a step-by-step resolution playbook and pre-formatted standard AR call notes.
+- `match_best_scenario(scenarios: list, claim_context: dict) -> dict`: Heuristic scoring engine matching claim CPT codes, modifiers, and root causes to the most granular scenario subgraph.
 
 ### `app.services.agent_logger`
 - `log_agent_run(db, claim_id, agent_type, input_payload, output_payload, confidence, hitl_required) -> AgentRun`: Persists execution audit log.
