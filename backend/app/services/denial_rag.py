@@ -28,24 +28,24 @@ Knowledge Graph Subgraph:
 {graph_context}
 
 Return pure JSON only with this structure:
-{
+{{
   "scenario_id": "string",
   "scenario_title": "string",
   "root_cause_analysis": "string",
   "investigation_checklist": ["step 1", "step 2"],
-  "payer_call_script": {
+  "payer_call_script": {{
     "question_1": "string",
     "question_2": "string"
-  },
-  "form_requirements": {
+  }},
+  "form_requirements": {{
     "form_name": "CMS-1500 / EDI 275",
     "box_number": "Box 24D / Box 23 / etc",
     "required_documents": ["document 1"]
-  },
+  }},
   "resolution_action_plan": ["step 1", "step 2"],
   "standard_ar_notes": "Formatted AR caller note with claim details",
   "confidence": 0.95
-}"""
+}}"""
 
 
 def parse_json_safely(text: str) -> dict:
@@ -150,43 +150,46 @@ async def run_denial_rag(claim_context: Dict[str, Any]) -> Dict[str, Any]:
     # Try LLM Synthesis via OpenRouter if key is present
     openrouter_key = os.getenv("OPENROUTER_API_KEY", "") or getattr(settings, "OPENROUTER_API_KEY", "")
     if openrouter_key:
-        prompt = RAG_SYNTHESIS_PROMPT.format(
-            claim_context=json.dumps(claim_context, indent=2),
-            graph_context=json.dumps({
-                "code": subgraph.code,
-                "category": subgraph.category,
-                "selected_scenario": selected_scenario
-            }, indent=2)
-        )
-        messages = [
-            {"role": "system", "content": "You are a senior healthcare RCM appeal and denial resolution director."},
-            {"role": "user", "content": prompt}
-        ]
-        for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
-            try:
-                async with httpx.AsyncClient(timeout=30.0) as client:
-                    resp = await client.post(
-                        f"{OPENROUTER_BASE_URL}/chat/completions",
-                        headers={
-                            "Authorization": f"Bearer {openrouter_key}",
-                            "Content-Type": "application/json",
-                            "HTTP-Referer": "https://novaarc.netlify.app",
-                            "X-Title": "NovaArc RCM"
-                        },
-                        json={
-                            "model": model,
-                            "messages": messages,
-                            "temperature": 0.2
-                        }
-                    )
-                    if resp.status_code == 200:
-                        data = resp.json()
-                        content = data["choices"][0]["message"]["content"]
-                        llm_result = parse_json_safely(content)
-                        if isinstance(llm_result, dict) and "resolution_action_plan" in llm_result:
-                            return llm_result
-            except Exception:
-                continue
+        try:
+            prompt = RAG_SYNTHESIS_PROMPT.format(
+                claim_context=json.dumps(claim_context, indent=2),
+                graph_context=json.dumps({
+                    "code": subgraph.code,
+                    "category": subgraph.category,
+                    "selected_scenario": selected_scenario
+                }, indent=2)
+            )
+            messages = [
+                {"role": "system", "content": "You are a senior healthcare RCM appeal and denial resolution director."},
+                {"role": "user", "content": prompt}
+            ]
+            for model in [PRIMARY_MODEL, FALLBACK_MODEL]:
+                try:
+                    async with httpx.AsyncClient(timeout=15.0) as client:
+                        resp = await client.post(
+                            f"{OPENROUTER_BASE_URL}/chat/completions",
+                            headers={
+                                "Authorization": f"Bearer {openrouter_key}",
+                                "Content-Type": "application/json",
+                                "HTTP-Referer": "https://novaarc.netlify.app",
+                                "X-Title": "NovaArc RCM"
+                            },
+                            json={
+                                "model": model,
+                                "messages": messages,
+                                "temperature": 0.2
+                            }
+                        )
+                        if resp.status_code == 200:
+                            data = resp.json()
+                            content = data["choices"][0]["message"]["content"]
+                            llm_result = parse_json_safely(content)
+                            if isinstance(llm_result, dict) and "resolution_action_plan" in llm_result:
+                                return llm_result
+                except Exception:
+                    continue
+        except Exception as e:
+            print(f"OpenRouter synthesis error: {e}")
 
     # Deterministic Knowledge Graph Fallback
     return {
