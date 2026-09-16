@@ -1,4 +1,4 @@
-name: Deploy Backend to Railway
+name: Deploy Backend to Render
 
 on:
   push:
@@ -10,20 +10,16 @@ on:
 
 jobs:
   deploy:
-    name: Deploy Backend to Railway
+    name: Deploy Backend to Render
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Install Railway CLI
-        run: npm install -g @railway/cli
-
-      - name: Deploy to Railway
-        working-directory: backend
+      - name: Trigger Render Deploy
         env:
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-        run: railway up --service novaarc-backend --detach
-
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY || 'rnd_aP3IkpQlJgFgw1J0QIdxIFoQbUAo' }}
+        run: |
+          curl -f -X POST "https://api.render.com/v1/services/srv-dakdusnqj5pc73ar1l7g/deploys" \
+            -H "Authorization: Bearer $RENDER_API_KEY" \
+            -H "Accept: application/json" \
+            -H "Content-Type: application/json"
       - name: Confirm deployment
-        run: echo "✅ Backend deployed to Railway successfully"
+        run: echo "✅ Backend deployment triggered on Render successfully"
