@@ -118,6 +118,16 @@ class ApiClient {
     return response.data;
   }
 
+  async extractClaimDocument(file: File, patientId?: string) {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (patientId) formData.append('patient_id', patientId);
+    const response = await this.client.post('/claims/extract-document', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+    return response.data;
+  }
+
   async updateClaim(claimId: number, data: Partial<{
     patient_id: number;
     provider_id: number;

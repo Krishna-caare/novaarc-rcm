@@ -3,7 +3,7 @@ import { X } from 'lucide-react';
 import { cn } from '../../lib/utils';
 import { Button } from './Button';
 
-type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | 'full';
+type ModalSize = 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '3xl' | '4xl' | '5xl' | 'full';
 
 interface ModalProps {
   open:       boolean;
@@ -19,12 +19,15 @@ interface ModalProps {
 }
 
 const sizeClasses: Record<ModalSize, string> = {
-  sm:   'max-w-sm',
-  md:   'max-w-md',
-  lg:   'max-w-lg',
-  xl:   'max-w-xl',
-  '2xl':'max-w-2xl',
-  full: 'max-w-5xl',
+  sm:    'max-w-sm',
+  md:    'max-w-md',
+  lg:    'max-w-lg',
+  xl:    'max-w-xl',
+  '2xl': 'max-w-2xl',
+  '3xl': 'max-w-3xl',
+  '4xl': 'max-w-4xl',
+  '5xl': 'max-w-5xl',
+  full:  'max-w-6xl',
 };
 
 export function Modal({

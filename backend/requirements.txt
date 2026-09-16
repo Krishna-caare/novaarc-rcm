@@ -25,8 +25,9 @@ langgraph==0.1.6
 langchain-core==0.2.38
 langchain-openai==0.1.22
 
-# EDI Parsing
+# EDI & Document Parsing
 pyx12==2.3.3
+pypdf>=4.0.0
 
 # HTTP Client
 httpx>=0.24.0,<0.26.0

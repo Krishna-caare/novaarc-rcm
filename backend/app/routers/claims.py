@@ -1,4 +1,6 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+import io
+import re
+from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
@@ -274,3 +276,110 @@ async def submit_claim(
         ).where(ClaimModel.claim_id == claim_id)
     )
     return res.scalar_one()
+
+
+@router.post("/extract-document")
+async def extract_claim_document(
+    file: UploadFile = File(...),
+    patient_id: Optional[str] = Form(None),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    """
+    Extract text content from uploaded medical records, encounter notes, or superbill (PDF, TXT, MD).
+    Automatically parses clinical notes and runs AI Medical Coding Specialist (Ling 3.0 / heuristics)
+    to suggest ICD-10 diagnosis codes, CPT procedure codes, and estimated charges.
+    """
+    content_type = file.content_type or ""
+    filename = file.filename or "document"
+    contents = await file.read()
+
+    extracted_text = ""
+
+    # PDF extraction using pypdf
+    if filename.lower().endswith(".pdf") or "pdf" in content_type:
+        try:
+            from pypdf import PdfReader
+            pdf_file = io.BytesIO(contents)
+            reader = PdfReader(pdf_file)
+            pages_text = []
+            for page in reader.pages:
+                t = page.extract_text()
+                if t:
+                    pages_text.append(t.strip())
+            extracted_text = "\n\n".join(pages_text)
+        except Exception as e:
+            try:
+                raw = contents.decode("latin-1", errors="ignore")
+                matches = re.findall(r"\((.*?)\)\s*Tj", raw)
+                if matches:
+                    extracted_text = " ".join(matches)
+                else:
+                    raise e
+            except Exception:
+                raise HTTPException(status_code=400, detail=f"Failed to extract text from PDF: {str(e)}")
+    else:
+        # Text, Markdown, CSV decode
+        try:
+            extracted_text = contents.decode("utf-8")
+        except UnicodeDecodeError:
+            extracted_text = contents.decode("latin-1", errors="ignore")
+
+    extracted_text = extracted_text.strip()
+    if not extracted_text:
+        raise HTTPException(status_code=400, detail="The uploaded document contains no readable text.")
+
+    # Contextual patient lookup if patient_id provided
+    patient_context = {}
+    if patient_id and patient_id.isdigit():
+        try:
+            p_res = await db.execute(select(Patient).where(Patient.patient_id == int(patient_id)))
+            patient_rec = p_res.scalar_one_or_none()
+            if patient_rec:
+                patient_context = {
+                    "mrn": patient_rec.mrn,
+                    "gender": getattr(patient_rec, "gender", None),
+                    "dob": str(getattr(patient_rec, "dob", "")) if getattr(patient_rec, "dob", None) else None
+                }
+        except Exception:
+            pass
+
+    # Call AI Medical Coding Specialist
+    from app.services.coding_agent import suggest_codes, generate_fallback_codes
+    try:
+        coding_result = await suggest_codes(extracted_text, patient_context)
+    except Exception:
+        coding_result = generate_fallback_codes(extracted_text)
+
+    # Fee schedule estimation
+    cpt_fee_schedule = {
+        "99213": 145.00,
+        "99214": 215.00,
+        "99215": 310.00,
+        "99203": 185.00,
+        "99204": 280.00,
+        "99205": 375.00,
+        "29881": 1850.00,
+        "29880": 2100.00,
+        "93000": 85.00,
+        "93306": 450.00,
+        "80053": 75.00,
+        "85025": 50.00,
+    }
+    suggested_cpts = [c.get("code") for c in coding_result.get("cpt_suggestions", []) if c.get("code")]
+    suggested_icds = [d.get("code") for d in coding_result.get("icd10_suggestions", []) if d.get("code")]
+
+    total_charge = sum(cpt_fee_schedule.get(code, 150.0) for code in suggested_cpts) if suggested_cpts else 250.0
+
+    return {
+        "filename": filename,
+        "extracted_text": extracted_text[:4000],
+        "word_count": len(extracted_text.split()),
+        "icd10_suggestions": coding_result.get("icd10_suggestions", []),
+        "cpt_suggestions": coding_result.get("cpt_suggestions", []),
+        "suggested_cpt": ", ".join(suggested_cpts) if suggested_cpts else "99213",
+        "suggested_icd10": ", ".join(suggested_icds) if suggested_icds else "I10",
+        "suggested_charge": round(total_charge, 2),
+        "confidence": float(coding_result.get("overall_confidence", 0.90)),
+        "documentation_gaps": coding_result.get("documentation_gaps", []),
+    }
