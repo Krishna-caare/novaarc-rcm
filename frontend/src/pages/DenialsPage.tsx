@@ -140,34 +140,179 @@ export function DenialsPage() {
     const desc = denial.description || '';
     const root = denial.root_cause || desc || 'Payer Remittance Discrepancy';
     const claimId = denial.claim_id || 'N/A';
+    const cpts = (denial.claim?.cpt_codes || []).map(String);
+    const hasSurg = cpts.some((c) => /^[1-6]\d{4}/.test(c));
+    const hasEm = cpts.some((c) => /^99[2-4]/.test(c));
 
     if (code === 'CO-16') {
+      if (hasSurg) {
+        return {
+          scenario_title: 'CO-16: Missing Operative Report / Surgical Notes',
+          root_cause_analysis: 'Payer requested signed operative or procedure report to substantiate surgical CPT code per LCD medical necessity guidelines.',
+          investigation_checklist: [
+            'Verify in EHR if surgeon finalized and electronically signed operative report within 24 hours of DOS',
+            'Confirm whether operative note was transmitted via clearinghouse 275 PWK attachment or certified fax',
+            'Verify if a remark code (RARC) accompanied the denial (e.g. M127, N29)'
+          ],
+          form_requirements: {
+            form_name: 'CMS-1500 / EDI 275 PWK Attachment',
+            box_number: 'Box 19 (Attachment Control / PWK Report Type BM)',
+            required_documents: ['Signed Operative Report', 'Pathology Report (if biopsy/excision)', 'Claim Cover Sheet with Claim ID & NPI']
+          },
+          payer_call_script: {
+            question_1: 'Can you verify specifically which clinical document is missing for line item 1?',
+            question_2: 'What is the direct secure fax number or EDI 275 attachment payer portal to submit operative records?',
+            question_3: 'Once documents are received, what is the exact reprocessing turnaround time window?',
+            question_4: 'Can you provide the call reference number and confirm timely filing is preserved?'
+          },
+          resolution_action_plan: [
+            'Pull signed operative report and pathology note from EHR (Epic/Cerner)',
+            'Attach CMS-1500 copy and remit notice cover sheet with Claim ID reference',
+            'Transmit via payer secure portal or certified fax with confirmation receipt',
+            'Follow up in 14 business days to confirm adjudication reprocessing'
+          ],
+          standard_ar_notes: `CALL STATUS: Claim CLM-${claimId} denied CO-16 for Missing Operative Report. Verified operative note present in EHR. Transmitted certified records packet to Medical Review Dept. Follow-up scheduled in 14 days. Call Ref: REF-${claimId}-OP.`,
+          confidence: 0.95
+        };
+      } else {
+        return {
+          scenario_title: 'CO-16: Missing Clinical Progress Notes / Encounter Documentation',
+          root_cause_analysis: 'Claim/service lacks clinical encounter notes or documentation to establish medical necessity for the outpatient visit.',
+          investigation_checklist: [
+            'Verify provider electronic signature and timestamp on clinical encounter progress note',
+            'Check that chief complaint, HPI, exam, and medical decision making (MDM) are fully documented',
+            'Confirm whether payer requires complete clinic notes or specific lab/diagnostic test results'
+          ],
+          form_requirements: {
+            form_name: 'CMS-1500 / Clinical Documentation Packet',
+            box_number: 'Box 19 (Medical Records Attached Indicator)',
+            required_documents: ['Signed Physician Progress Note', 'Encounter Summary', 'Lab / Diagnostic Reports']
+          },
+          payer_call_script: {
+            question_1: 'Which specific section of clinical documentation was deemed missing or incomplete?',
+            question_2: 'Can this be resubmitted through your secure provider correspondence portal?',
+            question_3: 'What is your re-adjudication turnaround timeframe once records are received?'
+          },
+          resolution_action_plan: [
+            'Export complete signed progress notes and encounter record from EHR',
+            'Prepare correspondence cover sheet with Claim ID, patient MRN, and date of service',
+            'Upload to payer provider portal or transmit via secure encrypted fax',
+            'Set calendar reminder for 14-day follow-up on claim reprocessing'
+          ],
+          standard_ar_notes: `CALL STATUS: Claim CLM-${claimId} denied CO-16 for Clinical Progress Notes. Exported signed encounter note from EHR. Submitted complete documentation packet via portal. Call Ref: REF-${claimId}-DOC.`,
+          confidence: 0.95
+        };
+      }
+    } else if (code === 'CO-197') {
       return {
-        scenario_title: 'CO-16: Missing Operative Report / Medical Records Documentation',
-        root_cause_analysis: 'The claim was adjudicated without the requisite operative report or clinical encounter notes required to establish procedural medical necessity per LCD guidelines.',
+        scenario_title: 'CO-197: Precertification / Prior Authorization Absent on Claim',
+        root_cause_analysis: 'Payer rejected claim because prior authorization was required for this procedure/service but was missing or invalid on initial submission.',
         investigation_checklist: [
-          'Verify in EHR if surgeon signed the operative note within 24 hours of date of service',
-          'Check clearinghouse attachment report to confirm if PWK / 275 attachment was transmitted',
-          'Inspect payer provider portal for exact missing document specification'
+          'Search EHR and payer authorization portal for existing prior authorization reference number',
+          'Check whether authorization was obtained under correct rendering provider NPI and DOS range',
+          'Determine if procedure qualifies for retroactive authorization or extenuating circumstance exception'
         ],
         form_requirements: {
-          form_name: 'CMS-1500 / EDI 275 PWK Attachment',
-          box_number: 'Box 19 (Attachment Control / PWK Report Type BM)',
-          required_documents: ['Operative Report', 'Physician Signed Progress Note', 'Pathology Report']
+          form_name: 'CMS-1500',
+          box_number: 'Box 23 (Prior Authorization Number)',
+          required_documents: ['Prior Authorization Approval Letter', 'Pre-Service Clinical Request', 'Corrected CMS-1500']
         },
         payer_call_script: {
-          question_1: 'Can you verify specifically which clinical document is missing for line item 1?',
-          question_2: 'What is the direct secure fax number or EDI 275 attachment payer portal to submit records?',
-          question_3: 'Once documents are received, what is the exact reprocessing turnaround time window?',
-          question_4: 'Can you provide the call reference number and confirm timely filing is preserved?'
+          question_1: 'Is an active prior authorization on file for this patient under their member ID for date of service?',
+          question_2: 'Can the authorization number be updated over the phone for immediate reprocessing?',
+          question_3: 'What is the payer deadline and criteria for submitting an urgent retro-authorization appeal?'
         },
         resolution_action_plan: [
-          'Pull signed operative report and progress note from EHR (Epic/Cerner)',
-          'Attach CMS-1500 copy and remit notice cover sheet with Claim ID reference',
-          'Transmit via payer secure portal or certified fax with confirmation receipt',
-          'Follow up in 14 business days to confirm adjudication reprocessing'
+          'Retrieve valid authorization approval number from payer web portal',
+          'Populate Authorization Number into CMS-1500 Box 23',
+          'Submit corrected claim electronically with Claim Frequency Code 7 (Replacement)',
+          'Follow up within 10 business days for payment release'
         ],
-        standard_ar_notes: `CALL STATUS: Claim CLM-${claimId} denied CO-16 for Missing Medical Records. Verified operative note present in EHR. Transmitted certified records packet to Medical Review Dept. Follow-up scheduled in 14 days. Call Ref: REF-${claimId}-AR.`,
+        standard_ar_notes: `CALL STATUS: Claim CLM-${claimId} denied CO-197 for missing prior authorization. Verified auth approval on file. Added auth # to Box 23 and submitted corrected claim. Call Ref: REF-${claimId}-AUTH.`,
+        confidence: 0.96
+      };
+    } else if (code === 'CO-29') {
+      return {
+        scenario_title: 'CO-29: The Time Limit for Filing Has Expired (Timely Filing)',
+        root_cause_analysis: 'Payer stated the initial claim was received past the contractual timely filing deadline.',
+        investigation_checklist: [
+          'Verify clearinghouse 999 and 277CA acceptance timestamps for original electronic transmission',
+          'Calculate days elapsed between Date of Service and initial clearinghouse submission',
+          'Confirm contractual timely filing limit (e.g. 90, 180, or 365 days) for this payer'
+        ],
+        form_requirements: {
+          form_name: 'CMS-1500 / Formal Timely Filing Appeal',
+          box_number: 'Box 22 (Original Reference Number) & EDI Audit Log',
+          required_documents: ['Clearinghouse 277CA Acceptance Report', 'EDI 999 Functional Acknowledgment', 'Original Claim Copy']
+        },
+        payer_call_script: {
+          question_1: 'Our clearinghouse records show electronic claim was accepted by payer on initial submission. Can you review the EDI trace ID?',
+          question_2: 'What is your specific timely filing window for this commercial line of business?',
+          question_3: 'Where can we fax or upload proof of timely filing for supervisor override?'
+        },
+        resolution_action_plan: [
+          'Export EDI 277CA acceptance receipt proving payer received claim within filing limit',
+          'Draft formal Timely Filing Appeal letter citing payer acceptance timestamp',
+          'Submit appeal packet with clearinghouse audit logs to payer appeals department',
+          'Track appeal resolution within 30-day decision window'
+        ],
+        standard_ar_notes: `CALL STATUS: Claim CLM-${claimId} denied CO-29 for timely filing. Pulled clearinghouse 277CA receipt proving timely receipt. Submitted formal timely filing dispute packet with EDI audit log. Call Ref: REF-${claimId}-TF.`,
+        confidence: 0.95
+      };
+    } else if (code === 'CO-22') {
+      return {
+        scenario_title: 'CO-22: Coordination of Benefits (COB) / Other Payer Primary',
+        root_cause_analysis: 'Payer records indicate another insurer is primary for this patient, or primary payer Explanation of Benefits (EOB) was not attached.',
+        investigation_checklist: [
+          'Check 270/271 eligibility response for active primary insurance or Medicare Secondary Payer (MSP) details',
+          'Contact patient to verify primary insurance coverage and confirm if COB update survey was returned',
+          'If primary payer already processed, verify primary remittance advice (835/EOB) is on file'
+        ],
+        form_requirements: {
+          form_name: 'CMS-1500 / EDI 837 Secondary Claim',
+          box_number: 'Box 9A-9D (Other Insured) & Box 29 (Amount Paid by Primary)',
+          required_documents: ['Primary Payer Explanation of Benefits (EOB)', 'COB Coordination Questionnaire']
+        },
+        payer_call_script: {
+          question_1: 'Can you confirm which carrier your system lists as primary insurance on date of service?',
+          question_2: 'Has the subscriber completed their annual Coordination of Benefits update survey?',
+          question_3: 'If we submit the primary EOB showing deductible/coinsurance, will line items reprocess?'
+        },
+        resolution_action_plan: [
+          'Contact subscriber to initiate three-way COB update call with insurance carrier',
+          'Obtain primary payer EOB showing payment amount, contractual adjustments, and patient liability',
+          'Cross-file claim as Secondary with primary EOB attached in Box 9/29',
+          'Monitor adjudication for secondary balance settlement'
+        ],
+        standard_ar_notes: `CALL STATUS: Claim CLM-${claimId} denied CO-22 Coordination of Benefits. Contacted subscriber to update primary insurance with carrier. Attached primary EOB and cross-filed secondary claim. Call Ref: REF-${claimId}-COB.`,
+        confidence: 0.94
+      };
+    } else if (code === 'CO-97') {
+      return {
+        scenario_title: 'CO-97: Bundled Service / NCCI Incidental Procedure',
+        root_cause_analysis: 'The benefit for this service is included in the payment for another service per CMS National Correct Coding Initiative (NCCI) PTP edits.',
+        investigation_checklist: [
+          'Check NCCI Procedure-to-Procedure (PTP) edit table for billed CPT combination',
+          'Determine if NCCI modifier indicator is 0 (never unbundle) or 1 (modifier allowed if clinically distinct)',
+          'Review operative / clinical report to determine if service was performed at a separate anatomic site or session'
+        ],
+        form_requirements: {
+          form_name: 'CMS-1500',
+          box_number: 'Box 24D (Modifier 59 / XE / XS / XU)',
+          required_documents: ['Operative Report highlighting distinct surgical incision or separate session', 'Corrected CMS-1500']
+        },
+        payer_call_script: {
+          question_1: 'Was procedure denied under NCCI Column 1 / Column 2 edit or payer proprietary bundling logic?',
+          question_2: 'Does your policy recognize Modifier 59 / XE for separate anatomical location for this code pair?',
+          question_3: 'If clinical documentation demonstrates separate incision, will you reprocess upon redetermination?'
+        },
+        resolution_action_plan: [
+          'Review physician documentation for distinct operative session or separate anatomical site',
+          'Append appropriate unbundling modifier (59, XE, XS) in Box 24D of corrected CMS-1500',
+          'Submit corrected claim with frequency code 7 and medical records attachment',
+          'Track for re-adjudication and separate line reimbursement'
+        ],
+        standard_ar_notes: `CALL STATUS: Claim CLM-${claimId} denied CO-97 bundled procedure. Verified clinical notes substantiate separate anatomical site. Appended Modifier 59 in Box 24D and submitted corrected claim. Call Ref: REF-${claimId}-BND.`,
         confidence: 0.95
       };
     } else if (code === 'CO-216') {

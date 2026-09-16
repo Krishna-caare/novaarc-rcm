@@ -70,50 +70,69 @@ def match_best_scenario(scenarios: List[Dict[str, Any]], claim_context: Dict[str
     description = str(claim_context.get("description", "")).lower()
     notes = str(claim_context.get("clinical_notes", "")).lower()
 
-    # Heuristic scoring
+    # Determine clinical nature of procedures
+    has_em = any(c.startswith("992") or c.startswith("993") or c.startswith("994") for c in cpts)
+    has_surgery = any(c.startswith(("1", "2", "3", "4", "5", "6")) and len(c) == 5 for c in cpts)
+    has_radiology = any(c.startswith("7") and len(c) == 5 for c in cpts)
+    has_lab = any(c.startswith("8") and len(c) == 5 for c in cpts)
+    has_dme = any(c.startswith(("A", "E", "L", "K")) for c in cpts)
+
     scored = []
     for sc in scenarios:
         score = 0
-        sc_text = f"{sc.get('id', '')} {sc.get('title', '')} {sc.get('root_cause', '')}".lower()
+        sc_id = str(sc.get('id', '')).lower()
+        sc_title = str(sc.get('title', '')).lower()
+        sc_text = f"{sc_id} {sc_title} {sc.get('root_cause', '')}".lower()
 
-        # Modifier 25 / E&M
-        if "modifier" in sc_text:
+        # Keyword match against root cause / description
+        if root_cause and any(word in sc_text for word in root_cause.split() if len(word) > 3):
+            score += 15
+
+        # Modifier 25 / E&M matching
+        if "mod-25" in sc_id or "modifier 25" in sc_title or "modifier" in sc_text:
             if "modifier" in description or "modifier" in root_cause:
-                score += 12
-            elif any(cpt.startswith("992") for cpt in cpts) and len(cpts) > 1:
-                score += 6
+                score += 25
+            elif has_em:
+                score += 12 # Office visits favor modifier 25 when modifier absent
 
-        # Surgery / Operative
-        if any(c in sc_text for c in ["operative", "surgery", "op note"]):
+        # Surgery / Operative note matching
+        if "op-note" in sc_id or "operative" in sc_text or "surgical" in sc_text:
             if "operative" in description or "operative" in root_cause or "op note" in description:
-                score += 12
-            elif any(cpt.startswith("2") or cpt.startswith("3") or cpt.startswith("4") or cpt.startswith("5") for cpt in cpts) or "surg" in notes:
-                score += 5
+                score += 25
+            elif has_surgery:
+                score += 15
+            else:
+                score -= 12 # Strongly penalize operative notes if NO surgical procedure on claim
 
-        # Taxonomy / NPI
-        if "taxonomy" in sc_text or "npi" in sc_text:
-            if "taxonomy" in root_cause or "npi" in root_cause or "taxonomy" in description or "npi" in description:
-                score += 12
-            elif "provider" in description:
-                score += 5
+        # General chart notes / progress note
+        if "chart" in sc_text or "progress note" in sc_text or "medical record" in sc_text:
+            if "medical record" in description or "records" in root_cause:
+                score += 20
+            elif has_em:
+                score += 8
 
-        # Prior auth on file vs retro
+        # Itemized Invoice / DME
+        if "invoice" in sc_text:
+            if has_dme or "invoice" in root_cause:
+                score += 20
+
+        # Prior Auth
         if "on file" in sc_text or "missing from claim" in sc_text:
             if claim_context.get("prior_auth_on_file"):
                 score += 15
         if "retro" in sc_text:
-            if "retro" in root_cause or not claim_context.get("prior_auth_on_file"):
-                score += 6
+            if "retro" in root_cause:
+                score += 20
 
         # Timely filing proof
         if "proof" in sc_text or "available" in sc_text:
             if claim_context.get("initial_submission_date") or "submitted timely" in root_cause:
-                score += 10
+                score += 15
 
         # COB Patient update
         if "patient" in sc_text and "update" in sc_text:
             if "patient" in description or "member" in description or "update" in root_cause:
-                score += 10
+                score += 15
 
         scored.append((score, sc))
 

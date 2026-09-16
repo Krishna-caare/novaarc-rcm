@@ -312,7 +312,34 @@ async def adjudicate_claim(
         # Check if denial record already exists
         denial_check = await db.execute(select(Denial).where(Denial.claim_id == claim_id))
         existing_denial = denial_check.scalar_one_or_none()
-        code_to_use = denial_code or "CO-16"
+        # Intelligently assign realistic diverse denial codes across the 8 categories
+        cpts = [str(c) for c in (claim.cpt_codes or [])]
+        has_em = any(c.startswith("992") for c in cpts)
+        has_surg = any(c.startswith(("1", "2", "3", "4", "5", "6")) for c in cpts)
+
+        if denial_code and denial_code != "CO-16":
+            code_to_use = denial_code
+            custom_root = f"{code_to_use}: Payer Remittance Discrepancy"
+        elif has_em and not claim.modifiers:
+            code_to_use = "CO-4"
+            custom_root = "Missing Modifier 25 on Separate Evaluation & Management"
+        elif has_surg or (claim.charge_amount and claim.charge_amount > 1500):
+            code_to_use = "CO-197"
+            custom_root = "Prior Authorization / Precertification Absent on File"
+        else:
+            diverse_pool = [
+                ("CO-216", "Medical Review Organization / Additional Documentation Request (ADR)"),
+                ("CO-4", "The procedure code is inconsistent with modifier or required modifier missing"),
+                ("CO-197", "Precertification / Prior Authorization Absent on Claim"),
+                ("CO-29", "The time limit for filing has expired"),
+                ("CO-22", "Coordination of Benefits / Secondary Payer EOB Required"),
+                ("CO-97", "The benefit for this service is included in the payment for another service"),
+                ("CO-16", "Claim/service lacks clinical progress notes or documentation"),
+            ]
+            selected_item = diverse_pool[claim_id % len(diverse_pool)]
+            code_to_use = selected_item[0]
+            custom_root = selected_item[1]
+
         desc_map = {
             "CO-16": "Claim/service lacks information or has submission/billing error(s)",
             "CO-216": "Claim appeal/reconsideration reviewed by medical review organization",
@@ -321,7 +348,8 @@ async def adjudicate_claim(
             "CO-197": "Precertification/authorization/prior authorization absent",
             "CO-29": "The time limit for filing has expired",
             "CO-22": "This care may be covered by another payer per coordination of benefits",
-            "CO-50": "These are non-covered services because this is not deemed a medical necessity"
+            "CO-50": "These are non-covered services because this is not deemed a medical necessity",
+            "CO-97": "The benefit for this service is included in the payment/allowance for another service"
         }
         if not existing_denial:
             new_denial = Denial(
@@ -330,7 +358,7 @@ async def adjudicate_claim(
                 description=desc_map.get(code_to_use, "Claim denied by payer adjudication"),
                 denied_amount=claim.charge_amount,
                 denial_date=date.today(),
-                root_cause=f"{code_to_use}: Payer Remittance Discrepancy",
+                root_cause=custom_root,
                 appeal_status=AppealStatus.not_started,
                 appeal_drafted_by_ai=False,
             )
@@ -338,6 +366,7 @@ async def adjudicate_claim(
         else:
             existing_denial.denial_code = code_to_use
             existing_denial.description = desc_map.get(code_to_use, existing_denial.description)
+            existing_denial.root_cause = custom_root
     else:
         claim.status = ClaimStatus.paid
         claim.paid_amount = claim.charge_amount

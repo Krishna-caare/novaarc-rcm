@@ -39,14 +39,34 @@ async def list_denials(
         )
         unmatched_claims = unmatched_res.scalars().all()
         if unmatched_claims:
+            diverse_pool = [
+                ("CO-4", "The procedure code is inconsistent with modifier or required modifier missing", "Missing Modifier 25 on Separate Evaluation & Management"),
+                ("CO-197", "Precertification/authorization/prior authorization absent", "Prior Authorization / Precertification Absent on File"),
+                ("CO-216", "Claim appeal/reconsideration reviewed by medical review organization", "Medical Review Organization / Additional Documentation Request (ADR)"),
+                ("CO-29", "The time limit for filing has expired", "The time limit for filing has expired"),
+                ("CO-22", "This care may be covered by another payer per coordination of benefits", "Coordination of Benefits / Secondary Payer EOB Required"),
+                ("CO-97", "The benefit for this service is included in the payment/allowance for another service", "NCCI Bundling / Incidental Procedure"),
+                ("CO-16", "Claim/service lacks information or has submission/billing error(s)", "Claim/service lacks clinical progress notes or documentation"),
+            ]
             for c in unmatched_claims:
+                cpts = [str(code) for code in (c.cpt_codes or [])]
+                has_em = any(code.startswith("992") for code in cpts)
+                has_surg = any(code.startswith(("1", "2", "3", "4", "5", "6")) for code in cpts)
+                if has_em and not c.modifiers:
+                    code_to_use, desc_to_use, root_to_use = diverse_pool[0]
+                elif has_surg or (c.charge_amount and c.charge_amount > 1500):
+                    code_to_use, desc_to_use, root_to_use = diverse_pool[1]
+                else:
+                    item = diverse_pool[c.claim_id % len(diverse_pool)]
+                    code_to_use, desc_to_use, root_to_use = item[0], item[1], item[2]
+
                 db.add(Denial(
                     claim_id=c.claim_id,
-                    denial_code="CO-16",
-                    description="Claim/service lacks information or has submission/billing error(s)",
+                    denial_code=code_to_use,
+                    description=desc_to_use,
                     denied_amount=c.charge_amount,
                     denial_date=date.today(),
-                    root_cause="Missing Information / Billing Error",
+                    root_cause=root_to_use,
                     appeal_status=AppealStatus.not_started,
                     appeal_drafted_by_ai=False,
                 ))
