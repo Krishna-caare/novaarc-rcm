@@ -149,6 +149,13 @@ class ApiClient {
     return response.data;
   }
 
+  async adjudicateClaim(claimId: number, outcome?: 'deny' | 'pay', denialCode?: string) {
+    const response = await this.client.post(`/claims/${claimId}/adjudicate`, null, {
+      params: { outcome, denial_code: denialCode },
+    });
+    return response.data;
+  }
+
   async getClaimsSummary() {
     const response = await this.client.get('/claims/stats/summary');
     return response.data;

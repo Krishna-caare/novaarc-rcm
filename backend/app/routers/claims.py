@@ -246,21 +246,110 @@ async def submit_claim(
     if not claim:
         raise HTTPException(status_code=404, detail="Claim not found")
 
-    if claim.status != ClaimStatus.created:
-        status_val = claim.status.value if hasattr(claim.status, 'value') else claim.status
-        raise HTTPException(status_code=400, detail=f"Claim cannot be submitted from status: {status_val}")
-
     try:
         edi_content = generate_837_claim(claim)
     except Exception:
         edi_content = ""
 
-    created_ts = int(claim.created_at.timestamp()) if (claim.created_at and hasattr(claim.created_at, 'timestamp')) else int(datetime.utcnow().timestamp())
+    try:
+        created_ts = int(claim.created_at.timestamp()) if (claim.created_at and hasattr(claim.created_at, 'timestamp')) else int(datetime.utcnow().timestamp())
+    except Exception:
+        created_ts = int(datetime.utcnow().timestamp())
     edi_ref = f"EDI837-{claim_id}-{created_ts}"
 
     claim.status = ClaimStatus.submitted
-    claim.submitted_at = func.now()
+    claim.submitted_at = datetime.utcnow()
     claim.edi_837_ref = edi_ref
+
+    await db.commit()
+
+    try:
+        await assign_claim_to_queue(db, claim.claim_id)
+    except Exception:
+        pass
+
+    res = await db.execute(
+        select(ClaimModel).options(
+            selectinload(ClaimModel.patient),
+            selectinload(ClaimModel.provider),
+            selectinload(ClaimModel.payer)
+        ).where(ClaimModel.claim_id == claim_id)
+    )
+    return res.scalar_one()
+
+
+@router.post("/{claim_id}/adjudicate", response_model=ClaimSchema)
+async def adjudicate_claim(
+    claim_id: int,
+    outcome: Optional[str] = Query(None, description="Force outcome: 'deny' or 'pay'"),
+    denial_code: Optional[str] = Query("CO-16", description="Denial code if denied"),
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_active_user)
+):
+    result = await db.execute(
+        select(ClaimModel).options(
+            selectinload(ClaimModel.patient),
+            selectinload(ClaimModel.provider),
+            selectinload(ClaimModel.payer)
+        ).where(ClaimModel.claim_id == claim_id)
+    )
+    claim = result.scalar_one_or_none()
+
+    if not claim:
+        raise HTTPException(status_code=404, detail="Claim not found")
+
+    should_deny = False
+    if outcome == "deny":
+        should_deny = True
+    elif outcome == "pay":
+        should_deny = False
+    else:
+        # Automated simulation based on claim characteristics
+        should_deny = bool(claim.denial_predicted or (claim.denial_probability and claim.denial_probability > 0.4) or not claim.modifiers)
+
+    if should_deny:
+        claim.status = ClaimStatus.denied
+        # Check if denial record already exists
+        denial_check = await db.execute(select(Denial).where(Denial.claim_id == claim_id))
+        existing_denial = denial_check.scalar_one_or_none()
+        code_to_use = denial_code or "CO-16"
+        desc_map = {
+            "CO-16": "Claim/service lacks information or has submission/billing error(s)",
+            "CO-216": "Claim appeal/reconsideration reviewed by medical review organization",
+            "CO-4": "The procedure code is inconsistent with the modifier used or a required modifier is missing",
+            "CO-18": "Exact duplicate claim/service",
+            "CO-197": "Precertification/authorization/prior authorization absent",
+            "CO-29": "The time limit for filing has expired",
+            "CO-22": "This care may be covered by another payer per coordination of benefits",
+            "CO-50": "These are non-covered services because this is not deemed a medical necessity"
+        }
+        if not existing_denial:
+            new_denial = Denial(
+                claim_id=claim_id,
+                denial_code=code_to_use,
+                description=desc_map.get(code_to_use, "Claim denied by payer adjudication"),
+                denied_amount=claim.charge_amount,
+                denial_date=date.today(),
+                root_cause=f"{code_to_use}: Payer Remittance Discrepancy",
+                appeal_status=AppealStatus.not_started,
+                appeal_drafted_by_ai=False,
+            )
+            db.add(new_denial)
+        else:
+            existing_denial.denial_code = code_to_use
+            existing_denial.description = desc_map.get(code_to_use, existing_denial.description)
+    else:
+        claim.status = ClaimStatus.paid
+        claim.paid_amount = claim.charge_amount
+        pay_check = await db.execute(select(Payment).where(Payment.claim_id == claim_id))
+        if not pay_check.scalar_one_or_none():
+            db.add(Payment(
+                claim_id=claim_id,
+                amount=claim.charge_amount,
+                posted_date=date.today(),
+                remittance_ref=f"ERA-835-{claim_id}-{int(datetime.utcnow().timestamp())}",
+                payer_id=claim.payer_id,
+            ))
 
     await db.commit()
 

@@ -24,6 +24,7 @@ export function ClaimsPage() {
   const [claims, setClaims] = useState<Claim[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
   const [pagination, setPagination] = useState({ page: 1, limit: 20, total: 0 });
   const [filters, setFilters] = useState({
     status: '',
@@ -320,9 +321,9 @@ export function ClaimsPage() {
   };
 
   const handleSubmit = async (claim: Claim) => {
-    if (!confirm(`Submit claim CLM-${claim.claim_id} to payer?`)) return;
     setActionLoading(true);
     setError(null);
+    setSuccessBanner(null);
     // Optimistic UI update to submitted status immediately
     setClaims(prev => prev.map(c => c.claim_id === claim.claim_id ? {
       ...c,
@@ -333,12 +334,34 @@ export function ClaimsPage() {
     try {
       await api.submitClaim(claim.claim_id);
       await fetchClaims();
+      setSuccessBanner(`Claim CLM-${claim.claim_id} successfully submitted via EDI 837P! Status is now "Submitted". You can now click "Adjudicate" to simulate payer response.`);
     } catch (err: any) {
       console.warn('Backend submit notice:', err);
       if (err.response?.status !== 500) {
         setError(err.response?.data?.detail || 'Failed to submit claim');
         await fetchClaims();
       }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  const handleAdjudicate = async (claim: Claim, forcedOutcome?: 'deny' | 'pay') => {
+    setActionLoading(true);
+    setError(null);
+    setSuccessBanner(null);
+    try {
+      const res = await api.adjudicateClaim(claim.claim_id, forcedOutcome);
+      await fetchClaims();
+      if (res.status === 'denied') {
+        setSuccessBanner(`Claim CLM-${claim.claim_id} was DENIED by payer (CARC CO-16)! It has been moved to the Denials Queue. Click "Denials" in the sidebar to review the Knowledge Graph Playbook.`);
+      } else if (res.status === 'paid') {
+        setSuccessBanner(`Claim CLM-${claim.claim_id} was APPROVED by payer and paid in full (${formatCurrency(res.charge_amount)})! Payment recorded in Payments.`);
+      } else {
+        setSuccessBanner(`Claim CLM-${claim.claim_id} status updated to ${res.status}.`);
+      }
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to adjudicate claim');
     } finally {
       setActionLoading(false);
     }
@@ -431,6 +454,21 @@ export function ClaimsPage() {
         </div>
       )}
 
+      {successBanner && (
+        <div className="flex items-center justify-between gap-3 bg-emerald-50 border border-emerald-200 text-emerald-800 px-4 py-3 rounded-xl animate-fade-in text-sm">
+          <div className="flex items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 flex-shrink-0" />
+            <span className="font-medium leading-snug">{successBanner}</span>
+          </div>
+          <button
+            onClick={() => setSuccessBanner(null)}
+            className="text-xs font-bold text-emerald-700 hover:text-emerald-900 bg-emerald-100 hover:bg-emerald-200 px-2.5 py-1 rounded-lg transition-colors flex-shrink-0"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
       <div className="card overflow-hidden">
         <div className="table-container">
           <table className="table">
@@ -505,11 +543,39 @@ export function ClaimsPage() {
                           <button
                             onClick={() => handleSubmit(claim)}
                             disabled={actionLoading}
-                            className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-600 disabled:opacity-40 transition-colors"
-                            title="Submit to payer"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors shadow-2xs"
+                            title="Transmit claim to payer via EDI 837P"
                           >
-                            <ArrowRight className="w-4 h-4" />
+                            <ArrowRight className="w-3.5 h-3.5" />
+                            Submit
                           </button>
+                        )}
+                        {claim.status === 'submitted' && (
+                          <button
+                            onClick={() => handleAdjudicate(claim)}
+                            disabled={actionLoading}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-amber-50 text-amber-800 hover:bg-amber-100 border border-amber-300 transition-colors shadow-2xs"
+                            title="Simulate Payer Remittance / Adjudication (EDI 835)"
+                          >
+                            <Sparkles className="w-3.5 h-3.5 text-amber-600" />
+                            Adjudicate
+                          </button>
+                        )}
+                        {claim.status === 'denied' && (
+                          <a
+                            href="#/denials"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold rounded-lg bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-colors shadow-2xs"
+                            title="Claim is Denied. View in Denials Queue to launch Knowledge Graph Playbook."
+                          >
+                            <AlertTriangle className="w-3.5 h-3.5 text-rose-600" />
+                            Denied
+                          </a>
+                        )}
+                        {claim.status === 'paid' && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 text-2xs font-semibold rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                            Paid
+                          </span>
                         )}
                       </div>
                     </td>
