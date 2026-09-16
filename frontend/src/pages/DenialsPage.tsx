@@ -5,7 +5,8 @@ import { Denial, AppealStatus } from '../types';
 import { 
   ChevronLeft, ChevronRight, Sparkles, Copy, Check, X, 
   AlertTriangle, ShieldAlert, FileText, CheckCircle2, 
-  RefreshCw, TrendingUp, DollarSign, Bot, ArrowRight
+  RefreshCw, TrendingUp, DollarSign, Bot, ArrowRight,
+  Brain, Phone, CheckSquare, Layers
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 
@@ -33,6 +34,12 @@ export function DenialsPage() {
   const [copied, setCopied] = useState(false);
   const [filterCode, setFilterCode] = useState<string | null>(null);
   const [aiLoadingStep, setAiLoadingStep] = useState(0);
+
+  // AI Knowledge Graph & RAG Playbook Modal State
+  const [selectedRagDenial, setSelectedRagDenial] = useState<Denial | null>(null);
+  const [ragLoading, setRagLoading] = useState(false);
+  const [ragData, setRagData] = useState<any>(null);
+  const [ragNotesCopied, setRagNotesCopied] = useState(false);
 
   useEffect(() => {
     fetchDenials();
@@ -126,6 +133,27 @@ export function DenialsPage() {
     setAppealDraft('');
     setAppealContext('');
     setCopied(false);
+  };
+
+  const handleOpenRagGuide = async (denial: Denial) => {
+    setSelectedRagDenial(denial);
+    setRagLoading(true);
+    setRagData(null);
+    setRagNotesCopied(false);
+    try {
+      const data = await api.getDenialRagRecommendation(denial.denial_id);
+      setRagData(data);
+    } catch (e: any) {
+      console.error('Failed to load Knowledge Graph RAG recommendation', e);
+    } finally {
+      setRagLoading(false);
+    }
+  };
+
+  const closeRagModal = () => {
+    setSelectedRagDenial(null);
+    setRagData(null);
+    setRagNotesCopied(false);
   };
 
   const handleStatusChange = async (denialId: number, newStatus: AppealStatus | string) => {
@@ -426,35 +454,45 @@ export function DenialsPage() {
                           )}
                         </div>
                       </td>
-                      <td className="px-4 py-3 text-right w-44 min-w-[160px] whitespace-nowrap">
-                        <button
-                          onClick={() => handleDraftAppeal(denial)}
-                          disabled={draftingAppeal}
-                          className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg shadow-xs transition-all w-32 ${
-                            isRowDrafting
-                              ? 'bg-blue-100 text-blue-700 border border-blue-300 animate-pulse'
-                              : denial.appeal_status === 'drafted'
-                              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
-                              : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20'
-                          }`}
-                        >
-                          {isRowDrafting ? (
-                            <>
-                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />
-                              Drafting...
-                            </>
-                          ) : denial.appeal_status === 'drafted' ? (
-                            <>
-                              <FileText className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
-                              View Appeal
-                            </>
-                          ) : (
-                            <>
-                              <Sparkles className="w-3.5 h-3.5 text-white flex-shrink-0" />
-                              Draft Appeal
-                            </>
-                          )}
-                        </button>
+                      <td className="px-4 py-3 text-right whitespace-nowrap">
+                        <div className="flex items-center justify-end gap-1.5">
+                          <button
+                            onClick={() => handleOpenRagGuide(denial)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-semibold rounded-lg bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border border-indigo-200/80 transition-all shadow-2xs"
+                            title="View AI Knowledge Graph Diagnosis, Investigation Checklist & Payer Script"
+                          >
+                            <Brain className="w-3.5 h-3.5 text-indigo-600" />
+                            Playbook
+                          </button>
+                          <button
+                            onClick={() => handleDraftAppeal(denial)}
+                            disabled={draftingAppeal}
+                            className={`inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-xs transition-all ${
+                              isRowDrafting
+                                ? 'bg-blue-100 text-blue-700 border border-blue-300 animate-pulse'
+                                : denial.appeal_status === 'drafted'
+                                ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20'
+                            }`}
+                          >
+                            {isRowDrafting ? (
+                              <>
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />
+                                Drafting...
+                              </>
+                            ) : denial.appeal_status === 'drafted' ? (
+                              <>
+                                <FileText className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                                View Appeal
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                                Draft Appeal
+                              </>
+                            )}
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -699,6 +737,224 @@ export function DenialsPage() {
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Knowledge Graph AI Playbook Modal ────────────── */}
+      {selectedRagDenial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-3xl w-full max-h-[88vh] overflow-hidden flex flex-col border border-slate-200 animate-slide-up">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/80">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 to-blue-600 text-white flex items-center justify-center shadow-xs">
+                  <Brain className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-base font-bold text-slate-900">
+                      AI Denial Playbook & Knowledge Graph Guidance
+                    </h2>
+                    <span className="px-2 py-0.5 rounded-full text-2xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                      GraphRAG
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Claim <strong className="text-blue-600">CLM-{selectedRagDenial.claim_id}</strong> · Denial <strong className="text-slate-700">DNL-{selectedRagDenial.denial_id}</strong> (Code {selectedRagDenial.denial_code})
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeRagModal}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-6 overflow-y-auto space-y-5 flex-1 bg-white">
+              {ragLoading ? (
+                <div className="py-16 text-center space-y-3">
+                  <RefreshCw className="w-8 h-8 text-indigo-600 animate-spin mx-auto" />
+                  <p className="text-sm font-semibold text-slate-800">Traversing Denial Knowledge Graph...</p>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    Matching clinical CPTs and root-cause indicators against 205 nodes and 197 relational ontologies.
+                  </p>
+                </div>
+              ) : ragData ? (
+                <>
+                  {/* Scenario Diagnosis Card */}
+                  <div className="p-4 rounded-xl bg-indigo-50/60 border border-indigo-100 space-y-2">
+                    <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-indigo-700">
+                      <Layers className="w-3.5 h-3.5" />
+                      Diagnosed Root-Cause Scenario
+                    </div>
+                    <h3 className="text-sm font-bold text-slate-900">
+                      {ragData.scenario_title || selectedRagDenial.denial_code}
+                    </h3>
+                    <p className="text-xs text-slate-600 leading-relaxed">
+                      {ragData.root_cause_analysis || selectedRagDenial.root_cause}
+                    </p>
+                  </div>
+
+                  {/* Pre-Call Investigation Checklist */}
+                  {ragData.investigation_checklist && ragData.investigation_checklist.length > 0 && (
+                    <div className="space-y-2.5">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <CheckSquare className="w-3.5 h-3.5 text-blue-600" />
+                        Pre-Call Investigation Checklist
+                      </h4>
+                      <div className="space-y-2 bg-slate-50 p-3.5 rounded-xl border border-slate-200/80">
+                        {ragData.investigation_checklist.map((step: string, idx: number) => (
+                          <label key={idx} className="flex items-start gap-2.5 text-xs text-slate-700 cursor-pointer select-none">
+                            <input type="checkbox" className="mt-0.5 rounded border-slate-300 text-blue-600 focus:ring-blue-500" />
+                            <span className="leading-snug">{step}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CMS-1500 & Form Box Requirements */}
+                  {ragData.form_requirements && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 text-purple-600" />
+                        CMS-1500 & EDI Field Mapping
+                      </h4>
+                      <div className="p-3.5 rounded-xl bg-purple-50/50 border border-purple-100 text-xs space-y-1.5">
+                        <div>
+                          <strong className="text-slate-700">Form:</strong> <span className="text-slate-900 font-medium">{ragData.form_requirements.form_name || 'CMS-1500'}</span>
+                        </div>
+                        <div>
+                          <strong className="text-slate-700">Correction Field:</strong> <span className="font-bold text-purple-700">{ragData.form_requirements.box_number || 'N/A'}</span>
+                        </div>
+                        {ragData.form_requirements.required_documents && (
+                          <div>
+                            <strong className="text-slate-700">Required Attachments:</strong>{' '}
+                            <span className="text-slate-600">
+                              {Array.isArray(ragData.form_requirements.required_documents)
+                                ? ragData.form_requirements.required_documents.join(', ')
+                                : ragData.form_requirements.required_documents}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Payer Phone Script */}
+                  {ragData.payer_call_script && Object.keys(ragData.payer_call_script).length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-pink-600" />
+                        Payer Call Script Questions
+                      </h4>
+                      <div className="space-y-2">
+                        {Object.entries(ragData.payer_call_script).map(([key, val], idx) => (
+                          <div key={idx} className="p-2.5 rounded-lg bg-pink-50/40 border-l-3 border-pink-500 text-xs text-slate-800 italic">
+                            <strong className="not-italic text-pink-800 mr-1.5">Q{idx + 1}:</strong>
+                            "{String(val)}"
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Step-by-Step Resolution Action Plan */}
+                  {ragData.resolution_action_plan && ragData.resolution_action_plan.length > 0 && (
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                        Step-by-Step Resolution Playbook
+                      </h4>
+                      <div className="space-y-1.5 bg-emerald-50/40 p-3.5 rounded-xl border border-emerald-100">
+                        {ragData.resolution_action_plan.map((step: string, idx: number) => (
+                          <div key={idx} className="flex items-start gap-2 text-xs text-slate-800">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 mt-0.5 flex-shrink-0" />
+                            <span>{step}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Pre-Formatted Standard AR Notes */}
+                  {ragData.standard_ar_notes && (
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-slate-500" />
+                          Pre-Formatted Standard AR Notes
+                        </h4>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            navigator.clipboard.writeText(ragData.standard_ar_notes);
+                            setRagNotesCopied(true);
+                            setTimeout(() => setRagNotesCopied(false), 2000);
+                          }}
+                          className="text-xs font-semibold text-blue-600 hover:text-blue-800 flex items-center gap-1"
+                        >
+                          {ragNotesCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                          {ragNotesCopied ? 'Copied!' : 'Copy Notes'}
+                        </button>
+                      </div>
+                      <pre className="p-3 bg-slate-900 text-slate-200 rounded-xl font-mono text-2xs overflow-x-auto whitespace-pre-wrap max-h-36 leading-relaxed">
+                        {ragData.standard_ar_notes}
+                      </pre>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="py-12 text-center text-slate-500 text-xs">
+                  No Knowledge Graph recommendation available for this denial.
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-3.5 border-t border-slate-200 bg-slate-50/80 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={closeRagModal}
+                className="px-4 py-2 rounded-lg text-xs font-semibold text-slate-700 hover:bg-slate-200/80 transition-colors"
+              >
+                Close
+              </button>
+              <div className="flex items-center gap-2">
+                {ragData && ragData.standard_ar_notes && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      navigator.clipboard.writeText(ragData.standard_ar_notes);
+                      setRagNotesCopied(true);
+                      setTimeout(() => setRagNotesCopied(false), 2000);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-semibold bg-white border border-slate-300 text-slate-700 hover:bg-slate-50 shadow-2xs transition-colors"
+                  >
+                    {ragNotesCopied ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
+                    {ragNotesCopied ? 'Copied!' : 'Copy AR Notes'}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    const denialToAppeal = selectedRagDenial;
+                    closeRagModal();
+                    if (denialToAppeal) {
+                      handleDraftAppeal(denialToAppeal);
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-500/20 transition-all"
+                >
+                  <Sparkles className="w-3.5 h-3.5" />
+                  Draft Formal Appeal
+                </button>
+              </div>
             </div>
           </div>
         </div>

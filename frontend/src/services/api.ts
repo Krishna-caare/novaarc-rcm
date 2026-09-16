@@ -182,6 +182,11 @@ class ApiClient {
     return response.data;
   }
 
+  async getDenialRagRecommendation(denialId: number) {
+    const response = await this.client.post(`/denials/${denialId}/rag-recommendation`);
+    return response.data;
+  }
+
   async listDenials(params?: {
     claim_id?: number;
     denial_code?: string;
