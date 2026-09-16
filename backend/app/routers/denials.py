@@ -8,7 +8,7 @@ from datetime import date
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user, require_ar_executive
-from app.models import Denial, Claim, AppealStatus
+from app.models import Denial, Claim, AppealStatus, ClaimStatus
 from app.schemas import Denial as DenialSchema, DenialCreate, DenialUpdate, DenialTopCodesResponse, AppealDraftRequest, AppealDraftResponse
 from app.services.appeal_agent import draft_appeal_letter
 from app.services.agent_logger import log_agent_run
@@ -28,6 +28,32 @@ async def list_denials(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    # Auto-sync any claims that are marked as denied but don't have a Denial record yet
+    try:
+        denial_claim_ids = select(Denial.claim_id)
+        unmatched_res = await db.execute(
+            select(Claim).where(
+                Claim.status == ClaimStatus.denied,
+                ~Claim.claim_id.in_(denial_claim_ids)
+            )
+        )
+        unmatched_claims = unmatched_res.scalars().all()
+        if unmatched_claims:
+            for c in unmatched_claims:
+                db.add(Denial(
+                    claim_id=c.claim_id,
+                    denial_code="CO-16",
+                    description="Claim/service lacks information or has submission/billing error(s)",
+                    denied_amount=c.charge_amount,
+                    denial_date=date.today(),
+                    root_cause="Missing Information / Billing Error",
+                    appeal_status=AppealStatus.not_started,
+                    appeal_drafted_by_ai=False,
+                ))
+            await db.commit()
+    except Exception:
+        pass
+
     query = select(Denial).options(
         selectinload(Denial.claim).selectinload(Claim.patient),
         selectinload(Denial.claim).selectinload(Claim.provider),

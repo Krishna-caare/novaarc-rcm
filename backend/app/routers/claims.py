@@ -7,7 +7,7 @@ from datetime import date, datetime
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
-from app.models import Claim as ClaimModel, ClaimStatus, Patient, Provider, Payer, Denial, Payment, AgentRun
+from app.models import Claim as ClaimModel, ClaimStatus, Patient, Provider, Payer, Denial, Payment, AgentRun, AppealStatus
 from app.schemas import (
     ClaimCreate, ClaimUpdate, Claim as ClaimSchema, ClaimDetail,
     ClaimSubmitRequest
@@ -173,7 +173,30 @@ async def update_claim(
     if claim.status == ClaimStatus.paid and (claim.paid_amount is None or claim.paid_amount == 0):
         claim.paid_amount = claim.charge_amount
 
+    # If status is set to denied, ensure a Denial record exists so it shows in Denials page and queue
+    if claim.status == ClaimStatus.denied:
+        denial_check = await db.execute(select(Denial).where(Denial.claim_id == claim_id))
+        existing_denial = denial_check.scalar_one_or_none()
+        if not existing_denial:
+            new_denial = Denial(
+                claim_id=claim_id,
+                denial_code="CO-16",
+                description="Claim/service lacks information or has submission/billing error(s)",
+                denied_amount=claim.charge_amount,
+                denial_date=date.today(),
+                root_cause="Missing Information / Billing Error",
+                appeal_status=AppealStatus.not_started,
+                appeal_drafted_by_ai=False,
+            )
+            db.add(new_denial)
+
     await db.commit()
+
+    if claim.status == ClaimStatus.denied:
+        try:
+            await assign_claim_to_queue(db, claim_id)
+        except Exception:
+            pass
 
     # Reload with relationships for full response serialization
     res = await db.execute(

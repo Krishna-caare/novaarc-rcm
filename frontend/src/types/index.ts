@@ -80,6 +80,7 @@ export interface Denial {
   root_cause: string | null;
   appeal_status: AppealStatus;
   appeal_drafted_by_ai: boolean;
+  claim?: Claim;
 }
 
 export interface Payment {

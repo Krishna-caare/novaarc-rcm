@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { cn, formatCurrency, formatDate } from '../lib/utils';
 import { Claim } from '../types';
-import { Filter, ChevronLeft, ChevronRight, Plus, Eye, Edit, ArrowRight, AlertTriangle, Sparkles } from 'lucide-react';
+import { Filter, ChevronLeft, ChevronRight, Plus, Eye, Edit, ArrowRight, AlertTriangle, Sparkles, ShieldAlert } from 'lucide-react';
 import { Modal } from '../components/ui/Modal';
 import { ClaimStatusBadge } from '../components/ui/Badge';
 
@@ -61,6 +61,7 @@ export function ClaimsPage() {
     icd10_codes: 'I10',
     modifiers: '',
   });
+  const [clinicalNotesInput, setClinicalNotesInput] = useState('Follow-up outpatient visit for 58yo male with essential hypertension (BP 148/92) and type 2 diabetes mellitus (HbA1c 7.8%). Medication adjusted.');
 
   useEffect(() => {
     const loadRefData = async () => {
@@ -82,11 +83,12 @@ export function ClaimsPage() {
     loadRefData();
   }, []);
 
-  const handleAiCodingAssist = async () => {
+  const handleAiCodingAssist = async (customNotes?: string) => {
     setAiCodingLoading(true);
     try {
       const patient = refData.patients.find(p => String(p.patient_id) === newClaimForm.patient_id);
-      const res = await api.codingAssist('Follow-up outpatient clinical encounter for hypertension and diabetes management.', { mrn: patient?.mrn });
+      const notesToUse = customNotes || clinicalNotesInput || 'Follow-up outpatient clinical encounter for hypertension and diabetes management.';
+      const res = await api.codingAssist(notesToUse, { mrn: patient?.mrn });
       if (res?.icd10_suggestions?.length > 0) {
         setNewClaimForm(prev => ({
           ...prev,
@@ -580,6 +582,14 @@ export function ClaimsPage() {
               {CLAIM_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
           </div>
+          {editForm.status === 'denied' && (
+            <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-2">
+              <ShieldAlert className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
+              <span>
+                <strong>Denial Workflow Trigger:</strong> Setting status to &quot;Denied&quot; automatically creates a Denial record (CO-16) and queues this claim in the Denials Management & Appeals workbench.
+              </span>
+            </div>
+          )}
           <div>
             <label className="label">CPT Codes (comma-separated)</label>
             <input
@@ -683,19 +693,84 @@ export function ClaimsPage() {
             <input type="number" step="0.01" className="input" placeholder="e.g. 250.00" value={newClaimForm.charge_amount} required
               onChange={e => setNewClaimForm({ ...newClaimForm, charge_amount: e.target.value })} />
           </div>
+          {/* ── Step 1: Clinical Documentation & AI Auto-Coding ── */}
+          <div className="p-3.5 bg-slate-50 border border-slate-200 rounded-xl space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1.5">
+                <span className="text-2xs font-bold bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded">Step 1</span>
+                <label className="label mb-0 text-xs font-bold text-slate-800">Clinical Documentation / Encounter Notes</label>
+              </div>
+              <button
+                type="button"
+                onClick={() => handleAiCodingAssist()}
+                disabled={aiCodingLoading}
+                className="inline-flex items-center gap-1 px-2.5 py-1 text-2xs font-bold rounded-lg bg-purple-600 hover:bg-purple-700 text-white shadow-2xs transition-colors"
+              >
+                <Sparkles className="w-3 h-3" />
+                {aiCodingLoading ? 'AI Coding in progress...' : 'AI Auto-Code with Ling 3.0'}
+              </button>
+            </div>
+            <textarea
+              rows={2}
+              className="input text-xs leading-relaxed"
+              placeholder="Paste physician encounter notes, clinical summary, or operative notes here..."
+              value={clinicalNotesInput}
+              onChange={e => setClinicalNotesInput(e.target.value)}
+            />
+            <div className="flex flex-wrap items-center gap-1.5 text-2xs text-slate-500">
+              <span className="font-semibold text-slate-400">Quick samples:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const note = "Follow-up outpatient visit for 58yo male with essential hypertension (BP 148/92) and type 2 diabetes mellitus (HbA1c 7.8%). Medication adjusted.";
+                  setClinicalNotesInput(note);
+                  handleAiCodingAssist(note);
+                }}
+                className="text-purple-600 hover:underline font-medium"
+              >
+                🩺 Hypertension & T2DM
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const note = "64yo female with exertional chest pain and dyspnea. Outpatient cardiology evaluation, 12-lead ECG, stress echo ordered.";
+                  setClinicalNotesInput(note);
+                  handleAiCodingAssist(note);
+                }}
+                className="text-purple-600 hover:underline font-medium"
+              >
+                🫀 Cardiology / Angina
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => {
+                  const note = "Postoperative day 14 follow-up for right knee diagnostic arthroscopy with partial medial meniscectomy. Physical therapy prescribed.";
+                  setClinicalNotesInput(note);
+                  handleAiCodingAssist(note);
+                }}
+                className="text-purple-600 hover:underline font-medium"
+              >
+                🦴 Knee Arthroscopy
+              </button>
+            </div>
+          </div>
+
           {aiCodingLoading && (
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl flex items-center gap-2.5 text-xs text-purple-800 animate-pulse">
               <Sparkles className="w-4 h-4 text-purple-600 animate-spin flex-shrink-0" />
               <span>AI Medical Coding Specialist (Ling 3.0 Flash Santé) is analyzing clinical encounter and suggesting codes...</span>
             </div>
           )}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="label mb-0">CPT Codes</label>
                 <button
                   type="button"
-                  onClick={handleAiCodingAssist}
+                  onClick={() => handleAiCodingAssist()}
                   disabled={aiCodingLoading}
                   className="inline-flex items-center gap-1 text-2xs font-semibold text-purple-600 hover:text-purple-800 transition-colors"
                 >
