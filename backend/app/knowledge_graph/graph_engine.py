@@ -76,61 +76,78 @@ class DenialKnowledgeGraph:
                 self._add_node(sc_node)
                 self._add_edge(code_id, sc_id, RelationType.MANIFESTS_AS, "Denial manifests in scenario")
 
-                # Investigation Step
+                # Investigation Steps as individual starburst leaves
                 inv_steps = sc.get("investigation_steps", [])
-                if inv_steps:
-                    inv_id = f"INV_{sc['id'].replace('-', '_')}"
+                for s_idx, step_text in enumerate(inv_steps):
+                    inv_id = f"INV_{sc['id'].replace('-', '_')}_{s_idx+1}"
                     inv_node = Node(
                         id=inv_id,
-                        label=f"Investigation: {sc['title'][:30]}...",
+                        label=step_text[:34] + ("..." if len(step_text) > 34 else ""),
                         type=NodeType.INVESTIGATION_STEP,
-                        description="; ".join(inv_steps),
-                        properties={"steps": inv_steps},
+                        description=step_text,
+                        properties={"step_index": s_idx + 1, "category_id": cat_id, "scenario": sc["id"]},
                     )
                     self._add_node(inv_node)
-                    self._add_edge(sc_id, inv_id, RelationType.REQUIRES_CHECK, "Requires clinical/billing checks")
+                    self._add_edge(sc_id, inv_id, RelationType.REQUIRES_CHECK, f"Verification check #{s_idx+1}")
 
-                # Payer Call Script
+                # Payer Call Questions as individual starburst leaves
                 call_script = sc.get("call_script", {})
-                if call_script:
-                    call_id = f"CALL_{sc['id'].replace('-', '_')}"
+                for q_idx, (q_key, q_val) in enumerate(call_script.items()):
+                    call_id = f"CALL_{sc['id'].replace('-', '_')}_{q_key}"
                     call_node = Node(
                         id=call_id,
-                        label=f"Call Script: {sc['title'][:30]}...",
+                        label=f"Q{q_idx+1}: {q_val[:28]}...",
                         type=NodeType.PAYER_QUESTION,
-                        description=f"{len(call_script)} phone inquiry questions",
-                        properties=call_script,
+                        description=q_val,
+                        properties={"question_key": q_key, "category_id": cat_id, "scenario": sc["id"]},
                     )
                     self._add_node(call_node)
-                    self._add_edge(sc_id, call_id, RelationType.CALL_SCRIPT, "Questions to ask payer representative")
+                    self._add_edge(sc_id, call_id, RelationType.CALL_SCRIPT, f"Phone inquiry {q_key}")
 
                 # Form & Field Requirements
                 form_req = sc.get("form_requirements", {})
                 if form_req:
+                    form_name = form_req.get("form_name", "CMS-1500")
+                    box_number = form_req.get("box_number", "Field Requirement")
                     form_id = f"FORM_{sc['id'].replace('-', '_')}"
                     form_node = Node(
                         id=form_id,
-                        label=f"Form: {form_req.get('form_name', 'CMS-1500')}",
+                        label=f"{box_number} ({form_name.split('/')[0].strip()})",
                         type=NodeType.FORM_REQUIREMENT,
-                        description=f"Box: {form_req.get('box_number', 'N/A')}",
+                        description=f"{form_name} - {box_number}. Required: {', '.join(form_req.get('required_documents', []))}",
                         properties=form_req,
                     )
                     self._add_node(form_node)
-                    self._add_edge(sc_id, form_id, RelationType.REQUIRES_FORM, "Specific form & box correction needed")
+                    self._add_edge(sc_id, form_id, RelationType.REQUIRES_FORM, "Form & field correction requirement")
 
-                # Resolution Action Plan
+                # Resolution Action Plan as individual action leaves
                 action_plan = sc.get("action_plan", [])
-                if action_plan:
-                    act_id = f"ACT_{sc['id'].replace('-', '_')}"
+                for a_idx, act_text in enumerate(action_plan):
+                    act_id = f"ACT_{sc['id'].replace('-', '_')}_{a_idx+1}"
                     act_node = Node(
                         id=act_id,
-                        label=f"Action Plan: {sc['title'][:30]}...",
+                        label=f"Action {a_idx+1}: {act_text[:30]}...",
                         type=NodeType.ACTION_PLAN,
-                        description=f"{len(action_plan)} step resolution playbook",
-                        properties={"steps": action_plan},
+                        description=act_text,
+                        properties={"step_index": a_idx + 1, "category_id": cat_id, "scenario": sc["id"]},
                     )
                     self._add_node(act_node)
-                    self._add_edge(sc_id, act_id, RelationType.RESOLVED_BY, "Step-by-step resolution playbook")
+                    self._add_edge(sc_id, act_id, RelationType.RESOLVED_BY, f"Playbook resolution action #{a_idx+1}")
+
+        # Cross-Ontology Clinical & Regulatory Interconnects (Bridges between related CARC clusters)
+        cross_links = [
+            ("CODE_CO_16", "CODE_CO_4", "Requires modifier or clinical notes unbundling"),
+            ("CODE_CO_16", "CODE_CO_216", "Documentation deficiency triggers ADR medical review"),
+            ("CODE_CO_197", "CODE_CO_16", "Missing authorization requires clinical record submission"),
+            ("CODE_CO_4", "CODE_CO_97", "NCCI Procedure-to-Procedure bundling modifier relationship"),
+            ("CODE_CO_29", "CODE_CO_22", "Secondary timely filing dependent on primary remittance receipt"),
+            ("CODE_CO_50", "CODE_CO_16", "Medical necessity determination substantiated by progress notes"),
+            ("CODE_CO_18", "CODE_CO_97", "Duplicate billing edit vs incidental procedure bundling"),
+            ("CODE_CO_27", "CODE_CO_22", "Terminated patient coverage requires COB carrier update"),
+        ]
+        for src, tgt, reason in cross_links:
+            if src in self.nodes and tgt in self.nodes:
+                self._add_edge(src, tgt, RelationType.RELATED_TO, reason)
 
     def get_overview(self) -> Dict[str, Any]:
         """Summary metrics of the knowledge graph"""

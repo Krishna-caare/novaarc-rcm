@@ -446,19 +446,18 @@ def build_viewer():
       'CAT_COB':                 { accent: '#f59e0b', name: 'COB' },
       'CAT_MEDICAL_NECESSITY':   { accent: '#8b5cf6', name: 'Med Necessity' },
       'CAT_CODING_MODIFIERS':    { accent: '#0ea5e9', name: 'Coding & Mod' },
-      'CAT_DUPLICATE_BUNDLING':  { accent: '#ec4899', name: 'Bundling' },
       'CAT_ELIGIBILITY':         { accent: '#6366f1', name: 'Eligibility' }
     };
 
     const CLUSTER_CENTERS = {
-      'CAT_MISSING_INFO':       { angle: 0,                   dist: 260 },
-      'CAT_PRIOR_AUTH':          { angle: Math.PI * 0.25,      dist: 260 },
-      'CAT_TIMELY_FILING':       { angle: Math.PI * 0.5,       dist: 260 },
-      'CAT_COB':                 { angle: Math.PI * 0.75,      dist: 260 },
-      'CAT_MEDICAL_NECESSITY':   { angle: Math.PI,             dist: 260 },
-      'CAT_CODING_MODIFIERS':    { angle: Math.PI * 1.25,      dist: 260 },
-      'CAT_DUPLICATE_BUNDLING':  { angle: Math.PI * 1.5,       dist: 260 },
-      'CAT_ELIGIBILITY':         { angle: Math.PI * 1.75,      dist: 260 }
+      'CAT_MISSING_INFO':       { angle: 0,                   dist: 175 },
+      'CAT_PRIOR_AUTH':          { angle: Math.PI * 0.25,      dist: 175 },
+      'CAT_TIMELY_FILING':       { angle: Math.PI * 0.5,       dist: 175 },
+      'CAT_COB':                 { angle: Math.PI * 0.75,      dist: 175 },
+      'CAT_MEDICAL_NECESSITY':   { angle: Math.PI,             dist: 175 },
+      'CAT_CODING_MODIFIERS':    { angle: Math.PI * 1.25,      dist: 175 },
+      'CAT_DUPLICATE_BUNDLING':  { angle: Math.PI * 1.5,       dist: 175 },
+      'CAT_ELIGIBILITY':         { angle: Math.PI * 1.75,      dist: 175 }
     };
 
     // Category Filter Chips
@@ -489,7 +488,7 @@ def build_viewer():
       return Object.assign({}, n, {
         categoryId: catId,
         x: 0, y: 0, vx: 0, vy: 0,
-        radius: (n.type === 'category' ? 10 : (n.type === 'denial_code' ? 6 : 3.2)),
+        radius: (n.type === 'category' ? 10.5 : (n.type === 'denial_code' ? 6.5 : (n.type === 'scenario' ? 4.2 : 2.6))),
         color: '#848a98'
       });
     });
@@ -505,39 +504,38 @@ def build_viewer():
     }).filter(function(l) { return l.sourceNode && l.targetNode; });
 
     // Propagate category ID to child nodes
-    links.forEach(function(l) {
-      if (l.sourceNode.categoryId && !l.targetNode.categoryId) {
-        l.targetNode.categoryId = l.sourceNode.categoryId;
-      }
-    });
-    links.forEach(function(l) {
-      if (l.sourceNode.categoryId && !l.targetNode.categoryId) {
-        l.targetNode.categoryId = l.sourceNode.categoryId;
-      }
-    });
+    for (let p = 0; p < 3; p++) {
+      links.forEach(function(l) {
+        if (l.sourceNode.categoryId && !l.targetNode.categoryId) {
+          l.targetNode.categoryId = l.sourceNode.categoryId;
+        }
+        if (l.targetNode.categoryId && !l.sourceNode.categoryId) {
+          l.sourceNode.categoryId = l.targetNode.categoryId;
+        }
+      });
+    }
 
     // Obsidian Palette Assignment:
-    // Only Category hubs and CARC code hubs have color accents; leaves are graphite silver
+    // Category hubs and CARC code hubs have color accents; leaves are graphite silver stars
     nodes.forEach(function(n, i) {
       const pal = CLUSTER_PALETTES[n.categoryId] || { accent: '#9ca3af' };
       if (n.type === 'category') {
         n.color = pal.accent;
-        n.radius = 9.5;
+        n.radius = 10.5;
       } else if (n.type === 'denial_code') {
         n.color = pal.accent;
-        n.radius = 5.8;
+        n.radius = 6.4;
       } else if (n.type === 'scenario') {
-        // Soft muted graphite with slight hint
-        n.color = '#949ba8';
-        n.radius = 3.6;
+        n.color = '#9aa2b1';
+        n.radius = 4.2;
       } else {
-        // Child checklists, form boxes, scripts: pure Obsidian graphite stars
-        n.color = '#6b7280';
-        n.radius = 2.4;
+        // Child checkpoints, form boxes, scripts, actions: pure Obsidian graphite-silver stars
+        n.color = '#798394';
+        n.radius = 2.6;
       }
 
       // Initial orbital position
-      const cluster = CLUSTER_CENTERS[n.categoryId] || { angle: (i / nodes.length) * Math.PI * 2, dist: 240 };
+      const cluster = CLUSTER_CENTERS[n.categoryId] || { angle: (i / nodes.length) * Math.PI * 2, dist: 160 };
       const cx = Math.cos(cluster.angle) * cluster.dist;
       const cy = Math.sin(cluster.angle) * cluster.dist;
 
@@ -546,19 +544,24 @@ def build_viewer():
         n.y = cy;
       } else if (n.type === 'denial_code') {
         const offsetAngle = Math.random() * Math.PI * 2;
-        const offsetDist = 40 + Math.random() * 55;
+        const offsetDist = 30 + Math.random() * 45;
+        n.x = cx + Math.cos(offsetAngle) * offsetDist;
+        n.y = cy + Math.sin(offsetAngle) * offsetDist;
+      } else if (n.type === 'scenario') {
+        const offsetAngle = Math.random() * Math.PI * 2;
+        const offsetDist = 50 + Math.random() * 60;
         n.x = cx + Math.cos(offsetAngle) * offsetDist;
         n.y = cy + Math.sin(offsetAngle) * offsetDist;
       } else {
         const offsetAngle = Math.random() * Math.PI * 2;
-        const offsetDist = 70 + Math.random() * 80;
+        const offsetDist = 65 + Math.random() * 75;
         n.x = cx + Math.cos(offsetAngle) * offsetDist;
         n.y = cy + Math.sin(offsetAngle) * offsetDist;
       }
     });
 
     // Organic Force Relaxation for Constellation Density
-    for (let step = 0; step < 110; step++) {
+    for (let step = 0; step < 130; step++) {
       // Repulsion
       for (let i = 0; i < nodes.length; i++) {
         for (let j = i + 1; j < nodes.length; j++) {
@@ -567,9 +570,9 @@ def build_viewer():
           let dx = b.x - a.x;
           let dy = b.y - a.y;
           let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const minDist = (a.radius + b.radius) * 3.8;
+          const minDist = (a.radius + b.radius) * 2.7;
           if (dist < minDist) {
-            const force = (minDist - dist) / dist * 0.28;
+            const force = (minDist - dist) / dist * 0.30;
             const fx = dx * force;
             const fy = dy * force;
             if (a.type !== 'category') { a.vx -= fx; a.vy -= fy; }
@@ -578,35 +581,40 @@ def build_viewer():
         }
       }
 
-      // Link spring
+      // Link spring attraction
       links.forEach(function(l) {
         const a = l.sourceNode;
         const b = l.targetNode;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
         const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        const targetDist = 28 + (a.radius + b.radius);
-        const force = (dist - targetDist) * 0.04;
+        let targetDist = 20 + (a.radius + b.radius);
+        if (a.type === 'category' || b.type === 'category') targetDist = 44;
+        else if (a.type === 'denial_code' || b.type === 'denial_code') targetDist = 28;
+        const force = (dist - targetDist) * 0.048;
         const fx = (dx / dist) * force;
         const fy = (dy / dist) * force;
-        if (a.type !== 'category') { a.vx += fx; a.vy += fy; }
+        if (a.type !== 'category') { a.vx -= fx; a.vy -= fy; }
         if (b.type !== 'category') { b.vx += fx; b.vy += fy; }
       });
 
-      // Gravity toward cluster anchor
+      // Gravity toward cluster anchor and central cosmic cohesion
       nodes.forEach(function(n) {
         if (n.type === 'category') return;
         const cluster = CLUSTER_CENTERS[n.categoryId];
         if (cluster) {
           const cx = Math.cos(cluster.angle) * cluster.dist;
           const cy = Math.sin(cluster.angle) * cluster.dist;
-          n.vx += (cx - n.x) * 0.009;
-          n.vy += (cy - n.y) * 0.009;
+          n.vx += (cx - n.x) * 0.011;
+          n.vy += (cy - n.y) * 0.011;
         }
+        // Subtle global pull to prevent stray drift
+        n.vx -= n.x * 0.0016;
+        n.vy -= n.y * 0.0016;
+
         n.x += n.vx;
         n.y += n.vy;
-        n.vx *= 0.72;
-        n.vy *= 0.72;
+        n.vx *= 0.70;
       });
     }
 
@@ -724,47 +732,64 @@ def build_viewer():
       ctx.scale(transform.scale, transform.scale);
 
       const activeFocus = selectedNode || hoveredNode;
+      const activeNeighbors = new Set();
+      if (activeFocus) {
+        links.forEach(function(l) {
+          if (l.sourceNode === activeFocus) activeNeighbors.add(l.targetNode);
+          if (l.targetNode === activeFocus) activeNeighbors.add(l.sourceNode);
+        });
+      }
 
-      // 1. Draw Links (Obsidian Delicate Filaments)
+      // 1. Draw Links (Obsidian High-Contrast Graphite Filaments)
       links.forEach(function(l) {
         const a = l.sourceNode;
         const b = l.targetNode;
 
-        const isConnected = activeFocus && (a === activeFocus || b === activeFocus);
-        const isDimmed = activeFocus && !isConnected;
+        const isDirect = activeFocus && (a === activeFocus || b === activeFocus);
+        const isNeighbor = activeFocus && !isDirect && activeNeighbors.has(a) && activeNeighbors.has(b);
+        const isDimmed = activeFocus && !isDirect && !isNeighbor;
 
         ctx.beginPath();
         ctx.moveTo(a.x, a.y);
         ctx.lineTo(b.x, b.y);
 
-        if (isConnected) {
+        if (isDirect) {
           ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 1.6;
-          ctx.globalAlpha = 0.9;
+          ctx.lineWidth = 2.4;
+          ctx.globalAlpha = 1.0;
+        } else if (isNeighbor) {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.70)';
+          ctx.lineWidth = 1.5;
+          ctx.globalAlpha = 0.88;
         } else if (isDimmed) {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.04)';
-          ctx.lineWidth = 0.5;
-          ctx.globalAlpha = 0.08;
+          ctx.strokeStyle = 'rgba(180, 195, 220, 0.12)';
+          ctx.lineWidth = 0.65;
+          ctx.globalAlpha = 0.30;
         } else {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.11)';
-          ctx.lineWidth = 0.75;
-          ctx.globalAlpha = 0.4;
+          // PROMINENT, CRISP OBSIDIAN LINKS (Properly visible like reference)
+          if (a.type === 'category' || b.type === 'category') {
+            ctx.strokeStyle = 'rgba(225, 235, 255, 0.65)'; // Category spine
+            ctx.lineWidth = 1.5;
+          } else if (a.type === 'denial_code' || b.type === 'denial_code') {
+            ctx.strokeStyle = 'rgba(200, 215, 240, 0.52)'; // Major code branches
+            ctx.lineWidth = 1.25;
+          } else {
+            ctx.strokeStyle = 'rgba(175, 192, 220, 0.40)'; // Fine constellation filaments
+            ctx.lineWidth = 1.0;
+          }
+          ctx.globalAlpha = 1.0;
         }
         ctx.stroke();
       });
       ctx.globalAlpha = 1.0;
 
-      // 2. Draw Nodes (Obsidian Graphite & Jewel Hubs)
+      // 2. Draw Nodes (Obsidian Constellation Stars & Jewel Hubs)
       nodes.forEach(function(n) {
         const isSelected = n === selectedNode;
         const isHovered = n === hoveredNode;
-        const isConnected = activeFocus && (
-          n === activeFocus ||
-          links.some(function(l) {
-            return (l.sourceNode === activeFocus && l.targetNode === n) ||
-                   (l.targetNode === activeFocus && l.sourceNode === n);
-          })
-        );
+        const isDirect = activeFocus && (n === activeFocus);
+        const isNeighbor = activeFocus && activeNeighbors.has(n);
+        const isConnected = isDirect || isNeighbor;
         const isDimmed = activeFocus && !isConnected;
         const isMatch = filterQuery && (
           n.label.toLowerCase().indexOf(filterQuery) !== -1 ||
@@ -773,12 +798,19 @@ def build_viewer():
 
         const r = n.radius * (isSelected ? 1.4 : (isHovered ? 1.25 : 1.0));
 
-        // Soft outer focus halo
+        // Soft outer focus halo for hubs & active nodes
         if (isSelected || isHovered) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, r + 4.5, 0, Math.PI * 2);
+          ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
           ctx.fillStyle = n.color;
-          ctx.globalAlpha = 0.25;
+          ctx.globalAlpha = 0.32;
+          ctx.fill();
+          ctx.globalAlpha = 1.0;
+        } else if (n.type === 'category' || n.type === 'denial_code') {
+          ctx.beginPath();
+          ctx.arc(n.x, n.y, r + 2.5, 0, Math.PI * 2);
+          ctx.fillStyle = n.color;
+          ctx.globalAlpha = isDimmed ? 0.05 : 0.18;
           ctx.fill();
           ctx.globalAlpha = 1.0;
         }
@@ -786,13 +818,13 @@ def build_viewer():
         // Node Body
         ctx.beginPath();
         ctx.arc(n.x, n.y, Math.max(1.8, r), 0, Math.PI * 2);
-        ctx.fillStyle = isSelected ? '#ffffff' : n.color;
-        ctx.globalAlpha = isDimmed ? 0.15 : 1.0;
+        ctx.fillStyle = isSelected ? '#ffffff' : (isHovered ? '#ffffff' : n.color);
+        ctx.globalAlpha = isDimmed ? 0.20 : 1.0;
         ctx.fill();
 
         // Node Edge Outline
-        ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? '#e5e7eb' : 'rgba(0, 0, 0, 0.6)');
-        ctx.lineWidth = isSelected ? 2.0 : (isHovered ? 1.4 : 0.6);
+        ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? n.color : 'rgba(0, 0, 0, 0.5)');
+        ctx.lineWidth = isSelected ? 2.0 : (isHovered ? 1.6 : 0.5);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
 

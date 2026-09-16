@@ -24,6 +24,8 @@ class RelationType(str, Enum):
     RESOLVED_BY = "RESOLVED_BY"
     REQUIRES_FORM = "REQUIRES_FORM"
     GOVERNED_BY = "GOVERNED_BY"
+    RELATED_TO = "RELATED_TO"
+    CROSS_REFERENCE = "CROSS_REFERENCE"
 
 
 @dataclass
