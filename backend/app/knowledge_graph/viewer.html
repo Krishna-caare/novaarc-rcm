@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NovaArc RCM — Denial Knowledge Graph 3D Sphere</title>
+  <title>NovaArc RCM — Denial Knowledge Graph Cluster Explorer</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: #030712;
+      background-color: #12141a;
       color: #f1f5f9;
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
       overflow: hidden;
@@ -22,7 +22,7 @@
       position: relative;
       height: 100%;
       min-width: 0;
-      background: radial-gradient(circle at 50% 50%, #0c1427 0%, #030712 100%);
+      background-color: #12141a;
       overflow: hidden;
     }
 
@@ -34,7 +34,7 @@
     }
     canvas:active { cursor: grabbing; }
 
-    /* Top Floating Header & Search */
+    /* Top Floating Header & Filter Controls */
     .top-bar {
       position: absolute;
       top: 16px;
@@ -49,55 +49,47 @@
     .top-bar > * { pointer-events: auto; }
 
     .brand-pill {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(56, 189, 248, 0.35);
-      backdrop-filter: blur(12px);
+      background: #1a1e29;
+      border: 1px solid #2e384d;
       padding: 8px 18px;
       border-radius: 9999px;
       font-size: 13px;
       font-weight: 700;
-      color: #38bdf8;
+      color: #e2e8f0;
       display: flex;
       align-items: center;
       gap: 10px;
-      box-shadow: 0 4px 25px rgba(0, 0, 0, 0.6), 0 0 15px rgba(56, 189, 248, 0.15);
-      letter-spacing: 0.02em;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      letter-spacing: 0.01em;
     }
-    .brand-pill .pulse-dot {
-      width: 9px;
-      height: 9px;
+    .brand-pill .dot {
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
-      background: #00f0ff;
-      box-shadow: 0 0 12px #00f0ff, 0 0 20px #00f0ff;
-      animation: pulseGlow 2s infinite alternate;
-    }
-    @keyframes pulseGlow {
-      from { opacity: 0.6; transform: scale(0.9); }
-      to { opacity: 1; transform: scale(1.15); }
+      background: #3b82f6;
     }
 
     .search-wrapper {
       position: relative;
       flex: 1;
-      max-width: 420px;
+      max-width: 380px;
     }
     .search-input {
       width: 100%;
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      backdrop-filter: blur(12px);
-      padding: 9px 18px 9px 40px;
+      background: #1a1e29;
+      border: 1px solid #2e384d;
+      padding: 9px 18px 9px 38px;
       border-radius: 9999px;
       color: #fff;
       font-size: 13px;
       outline: none;
-      transition: all 0.25s ease;
-      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+      transition: border-color 0.2s, box-shadow 0.2s;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
     }
     .search-input:focus {
-      border-color: #38bdf8;
-      box-shadow: 0 0 15px rgba(56, 189, 248, 0.35);
-      background: rgba(15, 23, 42, 0.95);
+      border-color: #3b82f6;
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.3);
+      background: #202634;
     }
     .search-icon {
       position: absolute;
@@ -105,7 +97,7 @@
       top: 50%;
       transform: translateY(-50%);
       color: #94a3b8;
-      font-size: 14px;
+      font-size: 13px;
       pointer-events: none;
     }
 
@@ -115,9 +107,8 @@
       flex-wrap: wrap;
     }
     .cat-chip {
-      background: rgba(15, 23, 42, 0.75);
-      border: 1px solid rgba(148, 163, 184, 0.2);
-      backdrop-filter: blur(8px);
+      background: #1a1e29;
+      border: 1px solid #2e384d;
       padding: 6px 12px;
       border-radius: 9999px;
       font-size: 11px;
@@ -127,126 +118,92 @@
       gap: 6px;
       cursor: pointer;
       color: #cbd5e1;
-      transition: all 0.2s;
+      transition: all 0.15s ease;
     }
     .cat-chip:hover, .cat-chip.active {
-      border-color: #38bdf8;
+      border-color: #94a3b8;
       color: #fff;
-      background: rgba(30, 58, 138, 0.4);
+      background: #252c3c;
       transform: translateY(-1px);
     }
     .cat-chip .dot {
-      width: 7px;
-      height: 7px;
+      width: 8px;
+      height: 8px;
       border-radius: 50%;
     }
 
-    /* Floating Center HUD inside Sphere */
-    .sphere-center-hud {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      pointer-events: none;
-      text-align: center;
-      opacity: 0.85;
-      transition: opacity 0.3s;
-      z-index: 2;
-    }
-    .sphere-center-hud h2 {
-      font-size: 26px;
-      font-weight: 800;
-      letter-spacing: 0.08em;
-      text-transform: uppercase;
-      background: linear-gradient(135deg, #ffffff 0%, #38bdf8 50%, #818cf8 100%);
-      -webkit-background-clip: text;
-      -webkit-text-fill-color: transparent;
-      text-shadow: 0 0 35px rgba(56, 189, 248, 0.5);
-    }
-    .sphere-center-hud p {
-      font-size: 11px;
-      letter-spacing: 0.15em;
-      text-transform: uppercase;
-      color: #94a3b8;
-      margin-top: 4px;
-      font-weight: 600;
-    }
-    .sphere-center-hud .stats-badge {
-      display: inline-block;
-      margin-top: 8px;
-      padding: 3px 10px;
-      border-radius: 9999px;
-      background: rgba(56, 189, 248, 0.12);
-      border: 1px solid rgba(56, 189, 248, 0.3);
-      font-size: 10px;
-      font-weight: 700;
-      color: #7dd3fc;
-    }
-
-    /* Bottom Control Bar */
-    .bottom-bar {
+    /* Floating Center Stats */
+    .cluster-stats-hud {
       position: absolute;
       bottom: 20px;
       left: 20px;
       display: flex;
-      gap: 10px;
+      gap: 8px;
       align-items: center;
       z-index: 10;
     }
     .ctrl-btn {
-      background: rgba(15, 23, 42, 0.85);
-      border: 1px solid rgba(148, 163, 184, 0.25);
-      backdrop-filter: blur(12px);
-      padding: 8px 14px;
-      border-radius: 8px;
-      color: #e2e8f0;
+      background: #1a1e29;
+      border: 1px solid #2e384d;
+      padding: 7px 13px;
+      border-radius: 6px;
+      color: #cbd5e1;
       font-size: 12px;
       font-weight: 600;
       cursor: pointer;
       display: flex;
       align-items: center;
       gap: 6px;
-      transition: all 0.2s;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+      transition: all 0.15s;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
     .ctrl-btn:hover {
-      background: rgba(30, 41, 59, 0.9);
-      border-color: #38bdf8;
-      color: #38bdf8;
+      background: #242c3d;
+      border-color: #64748b;
+      color: #fff;
     }
     .ctrl-btn.active {
-      background: rgba(14, 165, 233, 0.2);
-      border-color: #0284c7;
-      color: #38bdf8;
+      background: #1e3a8a;
+      border-color: #3b82f6;
+      color: #93c5fd;
     }
 
-    /* 3D Floating Tooltip */
+    .stats-tag {
+      background: rgba(18, 20, 26, 0.85);
+      border: 1px solid #2e384d;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #94a3b8;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+    }
+
+    /* Floating Tooltip */
     #node-tooltip {
       position: absolute;
       display: none;
       pointer-events: none;
-      background: rgba(11, 17, 32, 0.95);
-      border: 1px solid rgba(56, 189, 248, 0.4);
-      box-shadow: 0 8px 25px rgba(0, 0, 0, 0.8), 0 0 15px rgba(56, 189, 248, 0.2);
-      padding: 8px 14px;
-      border-radius: 8px;
+      background: #1a1e29;
+      border: 1px solid #3b4252;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.7);
+      padding: 8px 12px;
+      border-radius: 6px;
       font-size: 12px;
       color: #fff;
       z-index: 25;
       transform: translate(-50%, -130%);
       white-space: nowrap;
-      transition: opacity 0.15s;
     }
     #node-tooltip .tt-type {
       font-size: 10px;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #38bdf8;
+      letter-spacing: 0.05em;
       font-weight: 700;
       margin-bottom: 2px;
     }
     #node-tooltip .tt-title {
-      font-weight: 700;
+      font-weight: 600;
       font-size: 13px;
     }
 
@@ -254,40 +211,39 @@
     .sidebar {
       width: 440px;
       height: 100%;
-      background: #090e1a;
-      border-left: 1px solid rgba(148, 163, 184, 0.15);
+      background: #161a24;
+      border-left: 1px solid #252d3d;
       padding: 24px;
       overflow-y: auto;
       display: flex;
       flex-direction: column;
       gap: 18px;
-      box-shadow: -15px 0 35px rgba(0, 0, 0, 0.7);
+      box-shadow: -10px 0 25px rgba(0, 0, 0, 0.5);
       z-index: 20;
       user-select: text;
     }
     .sidebar::-webkit-scrollbar { width: 6px; }
-    .sidebar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 3px; }
+    .sidebar::-webkit-scrollbar-thumb { background: #2a3447; border-radius: 3px; }
 
     .sidebar-header {
-      border-bottom: 1px solid rgba(148, 163, 184, 0.15);
+      border-bottom: 1px solid #252d3d;
       padding-bottom: 16px;
     }
     .node-type-badge {
       display: inline-block;
-      padding: 4px 10px;
-      border-radius: 9999px;
+      padding: 3px 9px;
+      border-radius: 4px;
       font-size: 11px;
       font-weight: 700;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      margin-bottom: 10px;
-      box-shadow: 0 0 10px currentColor;
+      letter-spacing: 0.05em;
+      margin-bottom: 8px;
     }
     .sidebar-title {
-      font-size: 20px;
-      font-weight: 800;
+      font-size: 19px;
+      font-weight: 700;
       color: #f8fafc;
-      line-height: 1.3;
+      line-height: 1.35;
     }
     .sidebar-desc {
       font-size: 13px;
@@ -297,20 +253,19 @@
     }
 
     .section-card {
-      background: rgba(15, 23, 42, 0.75);
-      border: 1px solid rgba(148, 163, 184, 0.18);
-      border-radius: 10px;
+      background: #1b202e;
+      border: 1px solid #283347;
+      border-radius: 8px;
       padding: 14px;
       display: flex;
       flex-direction: column;
       gap: 10px;
-      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
     }
     .section-card h4 {
       font-size: 12px;
       text-transform: uppercase;
-      letter-spacing: 0.06em;
-      color: #38bdf8;
+      letter-spacing: 0.05em;
+      color: #93c5fd;
       font-weight: 700;
       display: flex;
       align-items: center;
@@ -325,14 +280,14 @@
     }
     .checklist-item::before {
       content: "•";
-      color: #38bdf8;
+      color: #60a5fa;
       font-weight: bold;
     }
     .script-item {
-      background: rgba(2, 6, 23, 0.6);
-      border-left: 3px solid #ec4899;
+      background: #121620;
+      border-left: 3px solid #f472b6;
       padding: 8px 12px;
-      border-radius: 0 6px 6px 0;
+      border-radius: 0 4px 4px 0;
       font-size: 12px;
       color: #f1f5f9;
       font-style: italic;
@@ -343,24 +298,24 @@
       color: #fff;
       border: none;
       padding: 6px 12px;
-      border-radius: 6px;
+      border-radius: 4px;
       font-size: 11px;
       font-weight: 700;
       cursor: pointer;
       display: inline-flex;
       align-items: center;
       gap: 5px;
-      transition: all 0.2s;
+      transition: background 0.15s;
     }
     .copy-btn:hover { background: #1d4ed8; }
     .notes-box {
-      background: #030712;
-      border: 1px solid #1e293b;
+      background: #0f121a;
+      border: 1px solid #252d3d;
       padding: 12px;
-      border-radius: 8px;
+      border-radius: 6px;
       font-family: 'Consolas', 'Courier New', monospace;
       font-size: 11px;
-      color: #94a3b8;
+      color: #cbd5e1;
       white-space: pre-wrap;
       max-height: 140px;
       overflow-y: auto;
@@ -368,17 +323,17 @@
     }
     .sub-item-link {
       padding: 10px;
-      background: rgba(15, 23, 42, 0.65);
-      border: 1px solid rgba(148, 163, 184, 0.12);
+      background: #151a24;
+      border: 1px solid #283347;
       border-radius: 6px;
       font-size: 12px;
       cursor: pointer;
-      border-left: 3px solid #34d399;
-      transition: all 0.2s;
+      border-left: 3px solid #3b82f6;
+      transition: background 0.15s, border-color 0.15s, transform 0.15s;
     }
     .sub-item-link:hover {
-      background: rgba(30, 41, 59, 0.8);
-      border-color: #38bdf8;
+      background: #1f2736;
+      border-color: #60a5fa;
       transform: translateX(3px);
     }
     .hint-box {
@@ -394,32 +349,25 @@
   <div id="canvas-container">
     <div class="top-bar">
       <div class="brand-pill">
-        <span class="pulse-dot"></span>
-        <span>NovaArc Knowledge Sphere</span>
+        <span class="dot"></span>
+        <span>NovaArc Knowledge Graph</span>
       </div>
 
       <div class="search-wrapper">
         <span class="search-icon">🔍</span>
-        <input type="text" id="search-box" class="search-input" placeholder="Search CARC, scenario, modifier (e.g. CO-16, 25, auth, NPI)..." />
+        <input type="text" id="search-box" class="search-input" placeholder="Search CARC, scenario, modifier (e.g. CO-16, CO-216, auth)..." />
       </div>
 
       <div class="category-pills" id="category-pills">
-        <!-- Rendered dynamically -->
+        <!-- Category chips rendered dynamically -->
       </div>
     </div>
 
-    <!-- Center HUD inside 3D Sphere -->
-    <div class="sphere-center-hud" id="sphere-hud">
-      <h2>NovaArc RCM</h2>
-      <p>Denial Intelligence Sphere</p>
-      <div class="stats-badge" id="hud-stats">205 NODES • 197 RELATIONS</div>
-    </div>
-
     <!-- Bottom Controls -->
-    <div class="bottom-bar">
-      <button class="ctrl-btn active" id="btn-rotate">⏸ Pause Rotation</button>
-      <button class="ctrl-btn" id="btn-reset">🎯 Reset View</button>
+    <div class="cluster-stats-hud">
+      <button class="ctrl-btn" id="btn-reset">🎯 Center Graph</button>
       <button class="ctrl-btn active" id="btn-labels">🏷️ Labels: ON</button>
+      <div class="stats-tag" id="hud-stats">205 NODES • 197 RELATIONS</div>
     </div>
 
     <!-- Tooltip -->
@@ -434,20 +382,21 @@
   <div class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div>
-        <div class="node-type-badge" id="badge-type" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid #38bdf8;">DENIAL INTELLIGENCE SPHERE</div>
-        <h3 class="sidebar-title" id="node-title">Knowledge Graph 3D Sphere</h3>
+        <div class="node-type-badge" id="badge-type" style="background: #1e3a8a; color: #93c5fd;">EXPLORER</div>
+        <h3 class="sidebar-title" id="node-title">Denial Knowledge Graph</h3>
       </div>
     </div>
     <div class="sidebar-desc" id="node-desc">
-      Click and drag the glowing 3D sphere to rotate. Click any glowing orb to inspect detailed denial root-cause scenarios, CMS-1500 box mappings, payer call scripts, and step-by-step resolution playbooks.
+      Click on any category cluster or code node to inspect root-cause scenarios, CMS-1500 box mappings, payer call scripts, and step-by-step resolution playbooks.
     </div>
 
     <div id="dynamic-sections" style="display: flex; flex-direction: column; gap: 14px;">
       <div class="hint-box">
         ✨ <strong>Interactive Controls:</strong><br/>
-        • <strong>Left Click + Drag:</strong> Rotate sphere in 3D<br/>
+        • <strong>Left Click + Drag:</strong> Pan network view<br/>
         • <strong>Mouse Wheel:</strong> Zoom in & out<br/>
-        • <strong>Click Node:</strong> Lock camera and open clinical/operational playbook
+        • <strong>Hover Node:</strong> Highlight cluster & connections<br/>
+        • <strong>Click Node:</strong> Lock focus & open resolution playbook
       </div>
     </div>
   </div>
@@ -471,36 +420,78 @@
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Color definitions per type
-    const TYPE_COLORS = {
-      category: '#38bdf8',           // Neon Cyan
-      denial_code: '#60a5fa',        // Electric Sky Blue
-      scenario: '#34d399',           // Vibrant Mint/Green
-      investigation_step: '#fbbf24', // Amber Yellow
-      payer_question: '#f43f5e',     // Bright Coral/Pink
-      form_requirement: '#c084fc',   // Electric Purple
-      action_plan: '#2dd4bf'         // Bright Teal
+    // Proper Scientific Community Palettes (Harmonious, Non-Neon, Gephi-Style)
+    const CLUSTER_PALETTES = {
+      'CAT_MISSING_INFO': {
+        primary: '#2563eb',       // Royal Blue
+        light: '#60a5fa',
+        tint: '#93c5fd',
+        line: 'rgba(59, 130, 246, 0.35)'
+      },
+      'CAT_PRIOR_AUTH': {
+        primary: '#059669',       // Deep Mint / Forest Green
+        light: '#34d399',
+        tint: '#6ee7b7',
+        line: 'rgba(16, 185, 129, 0.35)'
+      },
+      'CAT_TIMELY_FILING': {
+        primary: '#dc2626',       // Ruby / Crimson Red
+        light: '#f87171',
+        tint: '#fca5a5',
+        line: 'rgba(239, 68, 68, 0.35)'
+      },
+      'CAT_COB': {
+        primary: '#d97706',       // Amber / Warm Honey
+        light: '#fbbf24',
+        tint: '#fde68a',
+        line: 'rgba(245, 158, 11, 0.35)'
+      },
+      'CAT_MEDICAL_NECESSITY': {
+        primary: '#7c3aed',       // Royal Violet
+        light: '#a78bfa',
+        tint: '#c4b5fd',
+        line: 'rgba(139, 92, 246, 0.35)'
+      },
+      'CAT_CODING_MODIFIERS': {
+        primary: '#0891b2',       // Cerulean / Deep Teal
+        light: '#22d3ee',
+        tint: '#67e8f9',
+        line: 'rgba(6, 182, 212, 0.35)'
+      },
+      'CAT_DUPLICATE_BUNDLING': {
+        primary: '#db2777',       // Deep Rose / Mulberry
+        light: '#f472b6',
+        tint: '#fbcfe8',
+        line: 'rgba(236, 72, 153, 0.35)'
+      },
+      'CAT_ELIGIBILITY': {
+        primary: '#4f46e5',       // Deep Indigo
+        light: '#818cf8',
+        tint: '#a5b4fc',
+        line: 'rgba(99, 102, 241, 0.35)'
+      }
     };
 
-    // Category anchor angles on sphere (8 octahedral/equatorial points)
-    const CAT_ANCHORS = {
-      'CAT_MISSING_INFO': { phi: Math.PI * 0.35, theta: 0 },
-      'CAT_PRIOR_AUTH': { phi: Math.PI * 0.35, theta: Math.PI * 0.5 },
-      'CAT_TIMELY_FILING': { phi: Math.PI * 0.35, theta: Math.PI },
-      'CAT_COB': { phi: Math.PI * 0.35, theta: Math.PI * 1.5 },
-      'CAT_MEDICAL_NECESSITY': { phi: Math.PI * 0.65, theta: Math.PI * 0.25 },
-      'CAT_CODING_MODIFIERS': { phi: Math.PI * 0.65, theta: Math.PI * 0.75 },
-      'CAT_DUPLICATE_BUNDLING': { phi: Math.PI * 0.65, theta: Math.PI * 1.25 },
-      'CAT_ELIGIBILITY': { phi: Math.PI * 0.65, theta: Math.PI * 1.75 }
+    // Category cluster center coordinates (8 well-separated orbital anchor points)
+    const CLUSTER_CENTERS = {
+      'CAT_MISSING_INFO':       { angle: 0,                   dist: 280 },
+      'CAT_PRIOR_AUTH':          { angle: Math.PI * 0.25,      dist: 280 },
+      'CAT_TIMELY_FILING':       { angle: Math.PI * 0.5,       dist: 280 },
+      'CAT_COB':                 { angle: Math.PI * 0.75,      dist: 280 },
+      'CAT_MEDICAL_NECESSITY':   { angle: Math.PI,             dist: 280 },
+      'CAT_CODING_MODIFIERS':    { angle: Math.PI * 1.25,      dist: 280 },
+      'CAT_DUPLICATE_BUNDLING':  { angle: Math.PI * 1.5,       dist: 280 },
+      'CAT_ELIGIBILITY':         { angle: Math.PI * 1.75,      dist: 280 }
     };
 
     // Build category chips in header
     const catContainer = document.getElementById('category-pills');
     if (graphData.categories) {
       graphData.categories.forEach(function(cat) {
+        const pal = CLUSTER_PALETTES[cat.id] || { primary: '#3b82f6' };
         const chip = document.createElement('div');
         chip.className = 'cat-chip';
-        chip.innerHTML = '<span class="dot" style="background:' + (cat.color || '#38bdf8') + '; box-shadow: 0 0 6px ' + (cat.color || '#38bdf8') + '"></span>' + cat.name.split(' ')[0];
+        chip.innerHTML = '<span class="dot" style="background:' + pal.primary + '"></span>' + cat.name.split(' ')[0];
         chip.title = cat.name;
         chip.addEventListener('click', function() {
           selectCategory(cat.id);
@@ -509,37 +500,22 @@
       });
     }
 
-    // Sphere Radius
-    const SPHERE_RADIUS = 280;
+    // Helper to determine node's category ID
+    function getNodeCategoryId(node) {
+      if (node.type === 'category') return node.id;
+      if (node.properties && node.properties.category_id) return node.properties.category_id;
+      return null;
+    }
 
-    // Initialize 3D Node positions on spherical shell
-    const nodes = graphData.nodes.map(function(n, i) {
-      let phi, theta;
-      let r = SPHERE_RADIUS + (Math.random() - 0.5) * 40;
-
-      if (n.type === 'category') {
-        const anchor = CAT_ANCHORS[n.id] || { phi: Math.PI * 0.5, theta: (i / 8) * Math.PI * 2 };
-        phi = anchor.phi;
-        theta = anchor.theta;
-        r = SPHERE_RADIUS + 15;
-      } else {
-        // Fibonacci sphere distribution with cluster gravitation
-        const k = i + 0.5;
-        phi = Math.acos(1 - 2 * k / graphData.nodes.length);
-        theta = Math.PI * (1 + Math.sqrt(5)) * k;
-      }
-
-      // Convert spherical (r, phi, theta) to Cartesian (x, y, z)
-      const x = r * Math.sin(phi) * Math.cos(theta);
-      const y = r * Math.cos(phi);
-      const z = r * Math.sin(phi) * Math.sin(theta);
-
+    // Initialize Nodes with Community Cluster Layout
+    const nodes = graphData.nodes.map(function(n) {
+      let catId = getNodeCategoryId(n);
       return Object.assign({}, n, {
-        x: x, y: y, z: z,
-        baseX: x, baseY: y, baseZ: z,
-        radius: n.radius || (n.type === 'category' ? 14 : (n.type === 'denial_code' ? 10 : (n.type === 'scenario' ? 8 : 6))),
-        color: TYPE_COLORS[n.type] || n.color || '#38bdf8',
-        projX: 0, projY: 0, projScale: 1
+        categoryId: catId,
+        x: 0, y: 0, vx: 0, vy: 0,
+        radius: (n.type === 'category' ? 14 : (n.type === 'denial_code' ? 9 : (n.type === 'scenario' ? 6.5 : 4.5))),
+        color: '#94a3b8',
+        lineColor: 'rgba(148, 163, 184, 0.25)'
       });
     });
 
@@ -553,150 +529,192 @@
       });
     }).filter(function(l) { return l.sourceNode && l.targetNode; });
 
-    // Attract nodes toward connected neighbors in 3D to form organic constellations
-    for (let step = 0; step < 60; step++) {
+    // Propagate category ID down to child scenarios and leaves
+    links.forEach(function(l) {
+      if (l.sourceNode.categoryId && !l.targetNode.categoryId) {
+        l.targetNode.categoryId = l.sourceNode.categoryId;
+      }
+    });
+    // Second pass for leaves
+    links.forEach(function(l) {
+      if (l.sourceNode.categoryId && !l.targetNode.categoryId) {
+        l.targetNode.categoryId = l.sourceNode.categoryId;
+      }
+    });
+
+    // Assign Proper Non-Neon Palette Colors to all Nodes & Edges based on their cluster
+    nodes.forEach(function(n, i) {
+      const pal = CLUSTER_PALETTES[n.categoryId] || { primary: '#2563eb', light: '#60a5fa', tint: '#93c5fd', line: 'rgba(59,130,246,0.3)' };
+      if (n.type === 'category') {
+        n.color = pal.primary;
+      } else if (n.type === 'denial_code') {
+        n.color = pal.light;
+      } else if (n.type === 'scenario') {
+        n.color = pal.tint;
+      } else {
+        n.color = pal.light;
+      }
+      n.lineColor = pal.line;
+
+      // Position nodes in their cluster neighborhood
+      const cluster = CLUSTER_CENTERS[n.categoryId] || { angle: (i / nodes.length) * Math.PI * 2, dist: 250 };
+      const cx = Math.cos(cluster.angle) * cluster.dist;
+      const cy = Math.sin(cluster.angle) * cluster.dist;
+
+      if (n.type === 'category') {
+        n.x = cx;
+        n.y = cy;
+      } else if (n.type === 'denial_code') {
+        const offsetAngle = Math.random() * Math.PI * 2;
+        const offsetDist = 50 + Math.random() * 60;
+        n.x = cx + Math.cos(offsetAngle) * offsetDist;
+        n.y = cy + Math.sin(offsetAngle) * offsetDist;
+      } else {
+        const offsetAngle = Math.random() * Math.PI * 2;
+        const offsetDist = 90 + Math.random() * 85;
+        n.x = cx + Math.cos(offsetAngle) * offsetDist;
+        n.y = cy + Math.sin(offsetAngle) * offsetDist;
+      }
+    });
+
+    // Assign line colors based on source cluster
+    links.forEach(function(l) {
+      l.color = l.sourceNode.lineColor || 'rgba(148, 163, 184, 0.25)';
+    });
+
+    // Run Force Relaxation to create organic community clusters
+    for (let step = 0; step < 90; step++) {
+      // Repulsion between all nodes
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i];
+          const b = nodes[j];
+          let dx = b.x - a.x;
+          let dy = b.y - a.y;
+          let dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const minDist = (a.radius + b.radius) * 4.0;
+          if (dist < minDist) {
+            const force = (minDist - dist) / dist * 0.25;
+            const fx = dx * force;
+            const fy = dy * force;
+            if (a.type !== 'category') { a.vx -= fx; a.vy -= fy; }
+            if (b.type !== 'category') { b.vx += fx; b.vy += fy; }
+          }
+        }
+      }
+
+      // Spring attraction along links
       links.forEach(function(l) {
         const a = l.sourceNode;
         const b = l.targetNode;
         const dx = b.x - a.x;
         const dy = b.y - a.y;
-        const dz = b.z - a.z;
-        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 1;
-        const factor = (dist - 70) * 0.015;
-        if (a.type !== 'category') {
-          a.x += (dx / dist) * factor;
-          a.y += (dy / dist) * factor;
-          a.z += (dz / dist) * factor;
-        }
-        if (b.type !== 'category') {
-          b.x -= (dx / dist) * factor;
-          b.y -= (dy / dist) * factor;
-          b.z -= (dz / dist) * factor;
-        }
+        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+        const targetDist = 35 + (a.radius + b.radius);
+        const force = (dist - targetDist) * 0.035;
+        const fx = (dx / dist) * force;
+        const fy = (dy / dist) * force;
+        if (a.type !== 'category') { a.vx += fx; a.vy += fy; }
+        if (b.type !== 'category') { b.vx -= fx; b.vy -= fy; }
       });
 
-      // Keep them constrained to spherical shell
+      // Gravity toward cluster center
       nodes.forEach(function(n) {
-        const d = Math.sqrt(n.x * n.x + n.y * n.y + n.z * n.z) || 1;
-        const targetR = SPHERE_RADIUS + (n.type === 'category' ? 20 : (n.type === 'scenario' ? -10 : 0));
-        n.x = (n.x / d) * targetR;
-        n.y = (n.y / d) * targetR;
-        n.z = (n.z / d) * targetR;
+        if (n.type === 'category') return;
+        const cluster = CLUSTER_CENTERS[n.categoryId];
+        if (cluster) {
+          const cx = Math.cos(cluster.angle) * cluster.dist;
+          const cy = Math.sin(cluster.angle) * cluster.dist;
+          n.vx += (cx - n.x) * 0.008;
+          n.vy += (cy - n.y) * 0.008;
+        }
+        n.x += n.vx;
+        n.y += n.vy;
+        n.vx *= 0.75;
+        n.vy *= 0.75;
       });
     }
 
-    // 150 Background Cosmic Stars
-    const cosmicStars = [];
-    for (let i = 0; i < 180; i++) {
-      const starR = 500 + Math.random() * 400;
-      const sPhi = Math.acos(1 - 2 * Math.random());
-      const sTheta = Math.random() * Math.PI * 2;
-      cosmicStars.push({
-        x: starR * Math.sin(sPhi) * Math.cos(sTheta),
-        y: starR * Math.cos(sPhi),
-        z: starR * Math.sin(sPhi) * Math.sin(sTheta),
-        size: Math.random() * 1.6 + 0.5,
-        alpha: Math.random() * 0.7 + 0.2
-      });
-    }
-
-    // 3D Camera and Rotation State
-    let rotationX = 0.25;  // Pitch
-    let rotationY = 0.5;   // Yaw
-    let velX = 0;
-    let velY = 0.0025;      // Auto-rotation speed
-    let autoRotate = true;
-    let showLabels = true;
-    let zoom = 1.0;
-    const CAMERA_DISTANCE = 750;
-    const FOV = 550;
-
+    // Pan & Zoom Camera State
+    let transform = { x: 0, y: 0, scale: 0.95 };
     let isDragging = false;
-    let lastMouseX = 0;
-    let lastMouseY = 0;
+    let draggedNode = null;
+    let startPan = { x: 0, y: 0 };
     let hoveredNode = null;
     let selectedNode = null;
     let filterQuery = '';
+    let showLabels = true;
 
-    // Smooth focus animation target
-    let targetRotX = null;
-    let targetRotY = null;
+    // Smooth camera target
+    let targetTransform = null;
 
-    // Mouse & Touch Interaction
     canvas.addEventListener('mousedown', function(e) {
       const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+      const mouseX = (e.clientX - rect.left - width / 2 - transform.x) / transform.scale;
+      const mouseY = (e.clientY - rect.top - height / 2 - transform.y) / transform.scale;
 
       // Check click on node
-      const clicked = findNodeAtScreen(mouseX, mouseY);
-      if (clicked) {
-        selectNode(clicked);
-        return;
+      for (let i = nodes.length - 1; i >= 0; i--) {
+        const n = nodes[i];
+        const dx = mouseX - n.x;
+        const dy = mouseY - n.y;
+        const hitR = Math.max(n.radius * 1.6, 10);
+        if (dx * dx + dy * dy < hitR * hitR) {
+          draggedNode = n;
+          selectNode(n);
+          targetTransform = null;
+          return;
+        }
       }
 
       isDragging = true;
-      lastMouseX = e.clientX;
-      lastMouseY = e.clientY;
-      velX = 0;
-      velY = 0;
-      targetRotX = null;
-      targetRotY = null;
+      startPan = { x: e.clientX - transform.x, y: e.clientY - transform.y };
+      targetTransform = null;
     });
 
     window.addEventListener('mousemove', function(e) {
       const rect = canvas.getBoundingClientRect();
-      const mouseX = e.clientX - rect.left;
-      const mouseY = e.clientY - rect.top;
+      const mouseX = (e.clientX - rect.left - width / 2 - transform.x) / transform.scale;
+      const mouseY = (e.clientY - rect.top - height / 2 - transform.y) / transform.scale;
 
-      if (isDragging) {
-        const dx = e.clientX - lastMouseX;
-        const dy = e.clientY - lastMouseY;
-        velY = dx * 0.005;
-        velX = dy * 0.005;
-        rotationY += velY;
-        rotationX += velX;
-        lastMouseX = e.clientX;
-        lastMouseY = e.clientY;
+      if (draggedNode) {
+        draggedNode.x = mouseX;
+        draggedNode.y = mouseY;
+        draggedNode.vx = 0;
+        draggedNode.vy = 0;
+      } else if (isDragging) {
+        transform.x = e.clientX - startPan.x;
+        transform.y = e.clientY - startPan.y;
       } else {
         // Hover detection
-        const prevHovered = hoveredNode;
-        hoveredNode = findNodeAtScreen(mouseX, mouseY);
-        if (hoveredNode !== prevHovered) {
-          updateTooltip(hoveredNode, mouseX, mouseY);
+        let found = null;
+        for (let i = nodes.length - 1; i >= 0; i--) {
+          const n = nodes[i];
+          const dx = mouseX - n.x;
+          const dy = mouseY - n.y;
+          const hitR = Math.max(n.radius * 1.5, 9);
+          if (dx * dx + dy * dy < hitR * hitR) {
+            found = n;
+            break;
+          }
+        }
+        if (found !== hoveredNode) {
+          hoveredNode = found;
+          updateTooltip(hoveredNode, e.clientX - rect.left, e.clientY - rect.top);
         }
       }
     });
 
     window.addEventListener('mouseup', function() {
+      draggedNode = null;
       isDragging = false;
     });
 
     canvas.addEventListener('wheel', function(e) {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      zoom = Math.max(0.45, Math.min(2.8, zoom * zoomFactor));
+      transform.scale = Math.max(0.35, Math.min(3.2, transform.scale * zoomFactor));
     });
-
-    function findNodeAtScreen(mx, my) {
-      // Find closest node in front (depth sorted)
-      let closest = null;
-      let minDistance = 14;
-
-      for (let i = nodes.length - 1; i >= 0; i--) {
-        const n = nodes[i];
-        if (n.projZ < -150) continue; // Skip far back
-        const dx = mx - n.projX;
-        const dy = my - n.projY;
-        const hitRadius = Math.max(n.projRadius * 1.5, 12);
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        if (dist < hitRadius && dist < minDistance) {
-          minDistance = dist;
-          closest = n;
-        }
-      }
-      return closest;
-    }
 
     const tooltipEl = document.getElementById('node-tooltip');
     const ttType = document.getElementById('tt-type');
@@ -715,205 +733,141 @@
       tooltipEl.style.display = 'block';
     }
 
-    // Camera 3D Math & Project
-    function project3D(x, y, z, rotX, rotY) {
-      // Yaw (Y-axis rotation)
-      const cosY = Math.cos(rotY);
-      const sinY = Math.sin(rotY);
-      const x1 = x * cosY - z * sinY;
-      const z1 = z * cosY + x * sinY;
-
-      // Pitch (X-axis rotation)
-      const cosX = Math.cos(rotX);
-      const sinX = Math.sin(rotX);
-      const y2 = y * cosX - z1 * sinX;
-      const z2 = z1 * cosX + y * sinX;
-
-      // Perspective Projection
-      const k = (FOV / (CAMERA_DISTANCE - z2)) * zoom;
-      const screenX = width / 2 + x1 * k;
-      const screenY = height / 2 + y2 * k;
-
-      return {
-        x: screenX,
-        y: screenY,
-        z: z2,
-        scale: k
-      };
-    }
-
-    // Main 3D Render Loop
-    function render() {
-      // Handle Auto-rotation & Momentum
-      if (targetRotX !== null && targetRotY !== null) {
-        // Smooth camera lerp to focused node
-        rotationX += (targetRotX - rotationX) * 0.08;
-        rotationY += (targetRotY - rotationY) * 0.08;
-        if (Math.abs(targetRotX - rotationX) < 0.002 && Math.abs(targetRotY - rotationY) < 0.002) {
-          targetRotX = null;
-          targetRotY = null;
+    // Render Loop
+    function draw() {
+      if (targetTransform) {
+        transform.x += (targetTransform.x - transform.x) * 0.1;
+        transform.y += (targetTransform.y - transform.y) * 0.1;
+        transform.scale += (targetTransform.scale - transform.scale) * 0.1;
+        if (Math.abs(targetTransform.x - transform.x) < 0.5 &&
+            Math.abs(targetTransform.y - transform.y) < 0.5 &&
+            Math.abs(targetTransform.scale - transform.scale) < 0.005) {
+          targetTransform = null;
         }
-      } else if (!isDragging) {
-        if (autoRotate) {
-          velY = 0.0022;
-        }
-        rotationY += velY;
-        rotationX += velX;
-        velX *= 0.94;
-        if (!autoRotate) velY *= 0.94;
       }
 
       ctx.clearRect(0, 0, width, height);
 
-      // 1. Draw Cosmic Star Dust
       ctx.save();
-      cosmicStars.forEach(function(s) {
-        const p = project3D(s.x, s.y, s.z, rotationX, rotationY);
-        if (p.z > -CAMERA_DISTANCE + 50) {
-          ctx.beginPath();
-          ctx.arc(p.x, p.y, s.size * Math.max(0.5, p.scale), 0, Math.PI * 2);
-          ctx.fillStyle = 'rgba(255, 255, 255, ' + (s.alpha * Math.min(1, Math.max(0.1, (p.z + 500) / 1000))) + ')';
-          ctx.fill();
-        }
-      });
-      ctx.restore();
+      ctx.translate(width / 2 + transform.x, height / 2 + transform.y);
+      ctx.scale(transform.scale, transform.scale);
 
-      // 2. Project Nodes
-      nodes.forEach(function(n) {
-        const p = project3D(n.x, n.y, n.z, rotationX, rotationY);
-        n.projX = p.x;
-        n.projY = p.y;
-        n.projZ = p.z;
-        n.projScale = p.scale;
-        n.projRadius = Math.max(2, n.radius * p.scale);
-      });
+      const activeFocus = selectedNode || hoveredNode;
 
-      // 3. Draw Links with Depth Fading
+      // 1. Draw Links (Matching their source cluster community color)
       links.forEach(function(l) {
         const a = l.sourceNode;
         const b = l.targetNode;
-        const avgZ = (a.projZ + b.projZ) / 2;
 
-        const isHighlighted = (selectedNode && (a === selectedNode || b === selectedNode)) ||
-                              (hoveredNode && (a === hoveredNode || b === hoveredNode));
-
-        // Depth alpha factor
-        let baseAlpha = (avgZ + SPHERE_RADIUS) / (SPHERE_RADIUS * 2);
-        baseAlpha = Math.max(0.04, Math.min(0.85, baseAlpha));
+        const isConnected = activeFocus && (a === activeFocus || b === activeFocus);
+        const isDimmed = activeFocus && !isConnected;
 
         ctx.beginPath();
-        ctx.moveTo(a.projX, a.projY);
-        ctx.lineTo(b.projX, b.projY);
+        ctx.moveTo(a.x, a.y);
+        ctx.lineTo(b.x, b.y);
 
-        if (isHighlighted) {
-          ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
-          ctx.lineWidth = 2.4;
-          ctx.shadowColor = '#00f0ff';
-          ctx.shadowBlur = 10;
+        if (isConnected) {
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.2;
+          ctx.globalAlpha = 0.95;
+        } else if (isDimmed) {
+          ctx.strokeStyle = l.color;
+          ctx.lineWidth = 0.6;
+          ctx.globalAlpha = 0.08;
         } else {
-          ctx.strokeStyle = 'rgba(100, 149, 237, ' + (baseAlpha * 0.35) + ')';
-          ctx.lineWidth = Math.max(0.5, 1 * ((a.projScale + b.projScale) / 2));
-          ctx.shadowBlur = 0;
+          ctx.strokeStyle = l.color;
+          ctx.lineWidth = 0.9;
+          ctx.globalAlpha = 0.35;
         }
         ctx.stroke();
-        ctx.shadowBlur = 0;
       });
+      ctx.globalAlpha = 1.0;
 
-      // 4. Sort Nodes by Depth (Z-buffer rendering)
-      const sortedNodes = nodes.slice().sort(function(a, b) {
-        return a.projZ - b.projZ;
-      });
-
-      // 5. Draw Glowing Sphere Nodes
-      sortedNodes.forEach(function(n) {
+      // 2. Draw Nodes (Proper Solid Matte Orbs with Crisp Stroke)
+      nodes.forEach(function(n) {
         const isSelected = n === selectedNode;
         const isHovered = n === hoveredNode;
+        const isConnected = activeFocus && (
+          n === activeFocus ||
+          links.some(function(l) {
+            return (l.sourceNode === activeFocus && l.targetNode === n) ||
+                   (l.targetNode === activeFocus && l.sourceNode === n);
+          })
+        );
+        const isDimmed = activeFocus && !isConnected;
         const isMatch = filterQuery && (
           n.label.toLowerCase().indexOf(filterQuery) !== -1 ||
           (n.description && n.description.toLowerCase().indexOf(filterQuery) !== -1)
         );
 
-        // Alpha calculation based on depth
-        let depthAlpha = (n.projZ + SPHERE_RADIUS) / (SPHERE_RADIUS * 2);
-        depthAlpha = Math.max(0.2, Math.min(1.0, depthAlpha));
+        const r = n.radius * (isSelected ? 1.4 : (isHovered ? 1.25 : 1.0));
 
-        const r = n.projRadius * (isSelected ? 1.6 : (isHovered ? 1.4 : 1.0));
-
-        // Outer Glow Halo
-        if (isSelected || isHovered || isMatch || n.type === 'category') {
-          const glowR = r * (isSelected ? 3.5 : 2.5);
-          const glowGrad = ctx.createRadialGradient(n.projX, n.projY, r * 0.3, n.projX, n.projY, glowR);
-          glowGrad.addColorStop(0, n.color);
-          glowGrad.addColorStop(1, 'rgba(0,0,0,0)');
-
+        // Soft outer focus ring if selected or hovered
+        if (isSelected || isHovered) {
           ctx.beginPath();
-          ctx.arc(n.projX, n.projY, glowR, 0, Math.PI * 2);
-          ctx.fillStyle = glowGrad;
-          ctx.globalAlpha = isSelected ? 0.9 : 0.45;
+          ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
+          ctx.fillStyle = n.color;
+          ctx.globalAlpha = 0.22;
           ctx.fill();
           ctx.globalAlpha = 1.0;
         }
 
-        // Core Node Orb
+        // Node Body
         ctx.beginPath();
-        ctx.arc(n.projX, n.projY, Math.max(2, r), 0, Math.PI * 2);
+        ctx.arc(n.x, n.y, Math.max(2, r), 0, Math.PI * 2);
         ctx.fillStyle = n.color;
-        ctx.shadowColor = n.color;
-        ctx.shadowBlur = isSelected ? 20 : (isHovered ? 14 : 6);
-        ctx.globalAlpha = isSelected ? 1.0 : depthAlpha;
+        ctx.globalAlpha = isDimmed ? 0.2 : 1.0;
         ctx.fill();
-        ctx.globalAlpha = 1.0;
-        ctx.shadowBlur = 0;
 
-        // White Rim Highlight
-        ctx.strokeStyle = isSelected ? '#ffffff' : 'rgba(255, 255, 255, ' + (depthAlpha * 0.6) + ')';
-        ctx.lineWidth = isSelected ? 2.5 : 1;
+        // Node Rim
+        ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? '#f1f5f9' : 'rgba(0, 0, 0, 0.45)');
+        ctx.lineWidth = isSelected ? 2.5 : (isHovered ? 1.8 : 0.8);
         ctx.stroke();
+        ctx.globalAlpha = 1.0;
 
-        // Node Labels in 3D
+        // Clean Matte Typography (with contrast halo)
         const shouldShowLabel = showLabels && (
-          isSelected || isHovered || isMatch ||
+          isSelected || isHovered || isMatch || isConnected ||
           n.type === 'category' ||
-          (n.type === 'denial_code' && n.projZ > 50) ||
-          (n.projZ > 120 && n.type === 'scenario')
+          (n.type === 'denial_code' && transform.scale > 0.6) ||
+          (n.type === 'scenario' && transform.scale > 1.2)
         );
 
-        if (shouldShowLabel) {
-          const fontSize = Math.max(10, Math.round(11 * n.projScale));
-          ctx.font = (isSelected || n.type === 'category' ? 'bold ' : '500 ') + fontSize + 'px -apple-system, sans-serif';
-          ctx.fillStyle = isSelected ? '#38bdf8' : (n.projZ > 0 ? '#f8fafc' : 'rgba(203, 213, 225, ' + depthAlpha + ')');
+        if (shouldShowLabel && !isDimmed) {
+          const fontSize = n.type === 'category' ? 12 : (n.type === 'denial_code' ? 11 : 10);
+          ctx.font = (n.type === 'category' || isSelected ? '700 ' : '500 ') + fontSize + 'px -apple-system, sans-serif';
+
+          const maxChars = n.type === 'category' ? 28 : (n.type === 'denial_code' ? 20 : 16);
+          const displayLabel = n.label.length > maxChars ? n.label.slice(0, maxChars - 2) + '...' : n.label;
+
+          // Dark halo behind text for readability
+          ctx.shadowColor = '#12141a';
+          ctx.shadowBlur = 4;
+          ctx.fillStyle = isSelected ? '#ffffff' : (n.type === 'category' ? '#f8fafc' : '#cbd5e1');
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
-
-          const maxChars = n.type === 'category' ? 30 : 20;
-          const displayLabel = n.label.length > maxChars ? n.label.slice(0, maxChars - 2) + '...' : n.label;
-          ctx.fillText(displayLabel, n.projX, n.projY + r + 4);
+          ctx.fillText(displayLabel, n.x, n.y + r + 3);
+          ctx.shadowBlur = 0;
         }
       });
 
-      requestAnimationFrame(render);
+      ctx.restore();
+      requestAnimationFrame(draw);
     }
 
-    // Trigger Initial Render
-    render();
+    draw();
 
     // Select and inspect a node
     function selectNode(node) {
       selectedNode = node;
       displayNodeDetails(node);
 
-      // Rotate sphere so selected node faces directly towards camera (+Z)
-      // Vector: (node.x, node.y, node.z)
-      // We want this vector after yaw & pitch to align with (0, 0, +R)
-      const targetYaw = -Math.atan2(node.x, node.z);
-      const hyp = Math.sqrt(node.x * node.x + node.z * node.z);
-      const targetPitch = Math.atan2(node.y, hyp);
-
-      targetRotX = targetPitch;
-      targetRotY = targetYaw;
-      autoRotate = false;
-      document.getElementById('btn-rotate').textContent = '▶ Resume Rotation';
-      document.getElementById('btn-rotate').classList.remove('active');
+      // Smooth pan to center selected node
+      targetTransform = {
+        x: -node.x * transform.scale,
+        y: -node.y * transform.scale,
+        scale: Math.max(transform.scale, 1.0)
+      };
     }
 
     // Filter by Category
@@ -940,23 +894,12 @@
     });
 
     // Control Buttons
-    const btnRotate = document.getElementById('btn-rotate');
-    btnRotate.addEventListener('click', function() {
-      autoRotate = !autoRotate;
-      btnRotate.textContent = autoRotate ? '⏸ Pause Rotation' : '▶ Resume Rotation';
-      btnRotate.classList.toggle('active', autoRotate);
-      if (autoRotate) {
-        targetRotX = null;
-        targetRotY = null;
-      }
-    });
-
     const btnReset = document.getElementById('btn-reset');
     btnReset.addEventListener('click', function() {
-      targetRotX = 0.25;
-      targetRotY = 0.5;
-      zoom = 1.0;
+      targetTransform = { x: 0, y: 0, scale: 0.95 };
       selectedNode = null;
+      filterQuery = '';
+      searchBox.value = '';
     });
 
     const btnLabels = document.getElementById('btn-labels');
@@ -974,12 +917,11 @@
       const container = document.getElementById('dynamic-sections');
 
       badge.textContent = node.type.replace('_', ' ').toUpperCase();
-      badge.style.background = 'rgba(' + hexToRgb(node.color) + ', 0.2)';
-      badge.style.borderColor = node.color;
-      badge.style.color = node.color;
+      badge.style.background = node.color;
+      badge.style.color = '#ffffff';
 
       title.textContent = node.label;
-      desc.textContent = node.description || 'Knowledge graph celestial entity.';
+      desc.textContent = node.description || 'Knowledge graph operational entity.';
 
       let html = '';
 
@@ -1023,7 +965,7 @@
         }
 
         if (form && form.properties) {
-          html += '<div class="section-card"><h4><span>📋</span> CMS-1500 & Clearinghouse Fields</h4><div style="font-size: 12px; color: #f1f5f9; line-height: 1.5;"><strong>Form:</strong> ' + (form.properties.form_name || 'CMS-1500') + '<br/><strong>Box/Segment:</strong> <span style="color: #c084fc; font-weight: bold;">' + (form.properties.box_number || 'N/A') + '</span></div>';
+          html += '<div class="section-card"><h4><span>📋</span> CMS-1500 & Clearinghouse Fields</h4><div style="font-size: 12px; color: #f1f5f9; line-height: 1.5;"><strong>Form:</strong> ' + (form.properties.form_name || 'CMS-1500') + '<br/><strong>Box/Segment:</strong> <span style="color: #60a5fa; font-weight: bold;">' + (form.properties.box_number || 'N/A') + '</span></div>';
           if (form.properties.required_documents) {
             html += '<div style="margin-top: 6px; font-size: 11px; color: #94a3b8;"><strong>Required Attachments:</strong> ' + form.properties.required_documents.join(', ') + '</div>';
           }
@@ -1051,16 +993,7 @@
         }
       }
 
-      container.innerHTML = html || '<div class="hint-box">Sphere entity selected. Orbit or drag to inspect interconnections.</div>';
-    }
-
-    function hexToRgb(hex) {
-      if (!hex || hex[0] !== '#') return '56, 189, 248';
-      const bigint = parseInt(hex.slice(1), 16);
-      const r = (bigint >> 16) & 255;
-      const g = (bigint >> 8) & 255;
-      const b = bigint & 255;
-      return r + ', ' + g + ', ' + b;
+      container.innerHTML = html || '<div class="hint-box">Cluster node selected. Pan or drag to inspect neighborhood.</div>';
     }
 
     window.copyNotes = function() {
