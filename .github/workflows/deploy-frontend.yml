@@ -41,7 +41,7 @@ jobs:
       - name: Build
         working-directory: frontend
         env:
-          VITE_API_URL: ${{ secrets.VITE_API_URL }}
+          VITE_API_URL: ${{ secrets.VITE_API_URL || 'https://novaarc-backend.onrender.com' }}
           VITE_BASE_PATH: /novaarc-rcm/
         run: npm run build
 

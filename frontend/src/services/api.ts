@@ -10,8 +10,10 @@ declare global {
 }
 
 // In dev: VITE_API_URL is empty → axios uses relative URLs → Vite proxy forwards to Render
-// In prod (Netlify): VITE_API_URL=https://novaarc-backend.onrender.com is set in env vars
-const API_BASE_URL = import.meta.env.VITE_API_URL || '';
+// In prod (Netlify / GitHub Pages): fallback to Render backend URL if VITE_API_URL is not set
+const API_BASE_URL =
+  import.meta.env.VITE_API_URL ||
+  (import.meta.env.DEV ? '' : 'https://novaarc-backend.onrender.com');
 
 class ApiClient {
   private client: AxiosInstance;
@@ -41,7 +43,8 @@ class ApiClient {
         if (error.response?.status === 401) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('user');
-          window.location.href = '/login';
+          const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+          window.location.href = `${basePath}/login`;
         }
         return Promise.reject(error);
       }
