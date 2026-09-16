@@ -149,8 +149,9 @@ async def payer_performance(
             payer_name=row.name,
             total_charged=row.total_charged or Decimal("0"),
             total_paid=row.total_paid or Decimal("0"),
+            collection_rate=round(float((row.total_paid or 0) / (row.total_charged or 1) * 100), 1) if (row.total_charged and row.total_charged > 0) else 0.0,
             avg_days_to_pay=float(row.avg_days_to_pay or 0),
-            denial_rate=float((row.denied_count or 0) / (row.claim_count or 1)) * 100
+            denial_rate=round(float((row.denied_count or 0) / (row.claim_count or 1)) * 100, 1)
         )
         for row in result.all()
     ]

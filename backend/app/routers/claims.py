@@ -170,8 +170,24 @@ async def update_claim(
                     pass
         setattr(claim, field, value)
 
-    if claim.status == ClaimStatus.paid and (claim.paid_amount is None or claim.paid_amount == 0):
-        claim.paid_amount = claim.charge_amount
+    if claim.status == ClaimStatus.paid:
+        if claim.paid_amount is None or claim.paid_amount == 0:
+            claim.paid_amount = claim.charge_amount
+        # Check if a Payment record exists, if not create one so it appears in Payments page
+        pay_check = await db.execute(select(Payment).where(Payment.claim_id == claim_id))
+        if not pay_check.scalar_one_or_none():
+            db.add(Payment(
+                claim_id=claim_id,
+                amount=claim.paid_amount or claim.charge_amount,
+                posted_date=date.today(),
+                remittance_ref=f"ERA-{claim_id}-{int(datetime.utcnow().timestamp())}",
+                payer_id=claim.payer_id,
+            ))
+
+    if claim.status == ClaimStatus.submitted and not claim.submitted_at:
+        claim.submitted_at = func.now()
+        if not claim.edi_837_ref:
+            claim.edi_837_ref = f"EDI837-{claim_id}-{int(datetime.utcnow().timestamp())}"
 
     # If status is set to denied, ensure a Denial record exists so it shows in Denials page and queue
     if claim.status == ClaimStatus.denied:

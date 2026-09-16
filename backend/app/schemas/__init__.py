@@ -355,6 +355,7 @@ class DashboardPayerPerformance(BaseModel):
     payer_name: str
     total_charged: Decimal
     total_paid: Decimal
+    collection_rate: Optional[float] = 0.0
     avg_days_to_pay: float
     denial_rate: float
 

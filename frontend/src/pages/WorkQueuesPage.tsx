@@ -26,6 +26,10 @@ export function WorkQueuesPage() {
     try {
       const data = await api.listWorkQueues();
       setQueues(data);
+      if (data.length > 0 && !selectedQueue) {
+        setSelectedQueue(data[0]);
+        fetchQueueClaims(data[0].queue_id);
+      }
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load work queues');
     } finally {
@@ -117,50 +121,65 @@ export function WorkQueuesPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-1 space-y-4">
-          {queues.map((queue) => (
-            <div
-              key={queue.queue_id}
-              className={cn(
-                'cursor-pointer transition-all rounded-xl',
-                selectedQueue?.queue_id === queue.queue_id
-                  ? 'ring-2 ring-primary-500 bg-primary-50'
-                  : 'hover:bg-slate-50'
-              )}
-              onClick={() => handleQueueClick(queue)}
-            >
-              <Card className="cursor-pointer transition-all">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <FolderKanban className="w-5 h-5 text-primary-600" />
-                        <h3 className="font-semibold text-slate-900">{queue.name}</h3>
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Compact Queues List Widget */}
+        <div className="lg:col-span-4">
+          <Card className="overflow-hidden shadow-sm border border-slate-200/80 sticky top-4">
+            <CardHeader className="py-3 px-4 bg-slate-50/80 border-b border-slate-200/80">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <FolderKanban className="w-4 h-4 text-primary-600" />
+                  <CardTitle className="text-sm font-semibold text-slate-900">
+                    Active Queues ({queues.length})
+                  </CardTitle>
+                </div>
+                <span className="text-2xs font-medium text-slate-400 uppercase tracking-wider">
+                  Select Queue
+                </span>
+              </div>
+            </CardHeader>
+            <div className="divide-y divide-slate-100">
+              {queues.map((queue) => {
+                const isSelected = selectedQueue?.queue_id === queue.queue_id;
+                const badge = getPriorityBadge(queue.priority);
+                return (
+                  <button
+                    key={queue.queue_id}
+                    type="button"
+                    onClick={() => handleQueueClick(queue)}
+                    className={cn(
+                      'w-full text-left px-3.5 py-2.5 transition-all flex items-center justify-between gap-2 cursor-pointer border-l-[3px]',
+                      isSelected
+                        ? 'bg-primary-50/80 border-primary-600 text-slate-900'
+                        : 'border-transparent hover:bg-slate-50/80 text-slate-700'
+                    )}
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className={cn(
+                          'text-xs truncate',
+                          isSelected ? 'font-bold text-primary-950' : 'font-semibold text-slate-800'
+                        )}>
+                          {queue.name}
+                        </span>
                       </div>
-                      <p className="mt-1 text-sm text-slate-500 capitalize">{queue.priority} priority</p>
+                      <div className="flex items-center gap-2 text-2xs text-slate-500 mt-0.5">
+                        <span className="font-medium text-slate-700">{formatNumber(queue.claim_count)} claims</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="font-semibold text-emerald-700">{formatCurrency(queue.total_value)}</span>
+                      </div>
                     </div>
-                    <span className={getPriorityBadge(queue.priority).className}>
-                      {getPriorityBadge(queue.priority).label}
+                    <span className={cn('text-2xs px-2 py-0.5 rounded-full font-medium flex-shrink-0', badge.className)}>
+                      {badge.label}
                     </span>
-                  </div>
-                  <div className="mt-4 grid grid-cols-2 gap-4">
-                    <div className="text-center p-3 bg-slate-50 rounded-lg">
-                      <p className="text-2xl font-bold text-slate-900">{formatNumber(queue.claim_count)}</p>
-                      <p className="text-xs text-slate-500">Claims</p>
-                    </div>
-                    <div className="text-center p-3 bg-slate-50 rounded-lg">
-                      <p className="text-2xl font-bold text-slate-900">{formatCurrency(queue.total_value)}</p>
-                      <p className="text-xs text-slate-500">Total Value</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </button>
+                );
+              })}
             </div>
-          ))}
+          </Card>
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-8">
           {selectedQueue ? (
             <Card>
               <CardHeader>

@@ -5,21 +5,30 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number): string {
+export function formatCurrency(amount: number | string | null | undefined): string {
+  if (amount === null || amount === undefined) return '$0.00';
+  const num = typeof amount === 'number' ? amount : parseFloat(String(amount));
+  if (isNaN(num)) return '$0.00';
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amount);
+  }).format(num);
 }
 
-export function formatNumber(num: number): string {
-  return new Intl.NumberFormat('en-US').format(num);
+export function formatNumber(num: number | string | null | undefined): string {
+  if (num === null || num === undefined) return '0';
+  const val = typeof num === 'number' ? num : parseFloat(String(num));
+  if (isNaN(val)) return '0';
+  return new Intl.NumberFormat('en-US').format(val);
 }
 
-export function formatPercent(value: number): string {
-  return `${value.toFixed(1)}%`;
+export function formatPercent(value: number | string | null | undefined): string {
+  if (value === null || value === undefined) return '0.0%';
+  const num = typeof value === 'number' ? value : parseFloat(String(value));
+  if (isNaN(num)) return '0.0%';
+  return `${num.toFixed(1)}%`;
 }
 
 export function formatDate(dateStr: string | null | undefined): string {

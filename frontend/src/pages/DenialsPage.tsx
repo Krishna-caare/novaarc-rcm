@@ -128,6 +128,21 @@ export function DenialsPage() {
     setCopied(false);
   };
 
+  const handleStatusChange = async (denialId: number, newStatus: AppealStatus | string) => {
+    // Optimistically update local denials list
+    setDenials((prev) =>
+      prev.map((d) => (d.denial_id === denialId ? { ...d, appeal_status: newStatus as AppealStatus } : d))
+    );
+    if (selectedDenial?.denial_id === denialId) {
+      setSelectedDenial((prev) => (prev ? { ...prev, appeal_status: newStatus as AppealStatus } : null));
+    }
+    try {
+      await api.updateDenial(denialId, { appeal_status: newStatus as any });
+    } catch (err) {
+      console.warn('Failed to update appeal status:', err);
+    }
+  };
+
   const formatAppealStatus = (status: AppealStatus | string) => {
     const labels: Record<string, string> = {
       not_started: 'Not Started',
@@ -159,8 +174,11 @@ export function DenialsPage() {
     ? denials.filter((d) => d.denial_code === filterCode)
     : denials;
 
-  // KPI Calculations
-  const totalDeniedSum = denials.reduce((sum, d) => sum + (d.denied_amount || 0), 0);
+  // KPI Calculations - sanitized to never produce NaN
+  const totalDeniedSum = denials.reduce((sum, d) => {
+    const val = typeof d.denied_amount === 'number' ? d.denied_amount : parseFloat(String(d.denied_amount || 0));
+    return sum + (isNaN(val) ? 0 : val);
+  }, 0);
   const draftedCount = denials.filter((d) => d.appeal_status === 'drafted' || d.appeal_drafted_by_ai).length;
   const topCodeItem = topCodes[0];
 
@@ -388,11 +406,20 @@ export function DenialsPage() {
                       </td>
                       <td className="px-3 py-3 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
-                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold border ${getAppealStatusBadge(denial.appeal_status)}`}>
-                            {formatAppealStatus(denial.appeal_status)}
-                          </span>
+                          <select
+                            value={denial.appeal_status}
+                            onChange={(e) => handleStatusChange(denial.denial_id, e.target.value)}
+                            className={`text-2xs font-bold px-2 py-0.5 rounded-full border cursor-pointer bg-white transition-colors focus:ring-1 focus:ring-blue-500 ${getAppealStatusBadge(denial.appeal_status)}`}
+                            title="Click to update Appeal Status (Not Started -> Drafted -> Submitted -> Won / Lost)"
+                          >
+                            <option value="not_started">Not Started</option>
+                            <option value="drafted">Drafted</option>
+                            <option value="submitted">Submitted</option>
+                            <option value="won">Won (Approved)</option>
+                            <option value="lost">Lost (Upheld)</option>
+                          </select>
                           {denial.appeal_drafted_by_ai && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-2xs font-bold bg-purple-50 text-purple-700 rounded-md border border-purple-200">
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-2xs font-bold bg-purple-50 text-purple-700 rounded-md border border-purple-200" title="Drafted by AI Appeal Specialist">
                               <Sparkles className="w-2.5 h-2.5 text-purple-600" />
                               AI
                             </span>
@@ -612,7 +639,43 @@ export function DenialsPage() {
               </button>
 
               {!draftingAppeal && appealDraft && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-1.5 mr-2">
+                    <span className="text-2xs font-semibold text-slate-500 uppercase">Status:</span>
+                    <select
+                      value={selectedDenial.appeal_status}
+                      onChange={(e) => handleStatusChange(selectedDenial.denial_id, e.target.value)}
+                      className={`text-2xs font-bold px-2 py-1 rounded-lg border bg-white cursor-pointer ${getAppealStatusBadge(selectedDenial.appeal_status)}`}
+                    >
+                      <option value="drafted">Drafted</option>
+                      <option value="submitted">Submitted</option>
+                      <option value="won">Won (Overturned)</option>
+                      <option value="lost">Lost (Upheld)</option>
+                    </select>
+                  </div>
+
+                  {selectedDenial.appeal_status !== 'submitted' && selectedDenial.appeal_status !== 'won' && (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(selectedDenial.denial_id, 'submitted')}
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 transition-colors"
+                      title="Transmit appeal to payer"
+                    >
+                      Submit to Payer
+                    </button>
+                  )}
+
+                  {selectedDenial.appeal_status !== 'won' && (
+                    <button
+                      type="button"
+                      onClick={() => handleStatusChange(selectedDenial.denial_id, 'won')}
+                      className="inline-flex items-center gap-1 px-3 py-2 rounded-lg text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 transition-colors"
+                      title="Mark appeal won and denial reversed"
+                    >
+                      Mark as Won
+                    </button>
+                  )}
+
                   <button
                     type="button"
                     onClick={handleCopy}
@@ -625,12 +688,12 @@ export function DenialsPage() {
                     {copied ? (
                       <>
                         <Check className="w-4 h-4" />
-                        Copied to Clipboard!
+                        Copied!
                       </>
                     ) : (
                       <>
                         <Copy className="w-4 h-4" />
-                        Copy Appeal Letter
+                        Copy Letter
                       </>
                     )}
                   </button>

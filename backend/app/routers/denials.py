@@ -142,7 +142,26 @@ async def update_denial(
 
     update_data = denial_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
+        if field == "appeal_status" and value is not None and isinstance(value, str):
+            try:
+                value = AppealStatus(value)
+            except ValueError:
+                pass
         setattr(denial, field, value)
+
+    # Sync claim status and payment when appeal is won or submitted
+    if denial.appeal_status == AppealStatus.won:
+        claim_res = await db.execute(select(Claim).where(Claim.claim_id == denial.claim_id))
+        c = claim_res.scalar_one_or_none()
+        if c:
+            c.status = ClaimStatus.paid
+            if not c.paid_amount or c.paid_amount == 0:
+                c.paid_amount = c.charge_amount
+    elif denial.appeal_status == AppealStatus.submitted:
+        claim_res = await db.execute(select(Claim).where(Claim.claim_id == denial.claim_id))
+        c = claim_res.scalar_one_or_none()
+        if c and c.status != ClaimStatus.appealed:
+            c.status = ClaimStatus.appealed
 
     await db.commit()
     await db.refresh(denial)

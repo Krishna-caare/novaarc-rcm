@@ -403,26 +403,35 @@ export function DashboardPage() {
           {/* Payer Performance Tab */}
           {!loading && activeTab === 'payers' && (
             <div>
-              <h3 className="font-semibold text-slate-800 text-sm mb-4">Payer Performance Overview</h3>
-              <div className="table-container">
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Payer</th>
-                      <th>Charged</th>
-                      <th>Paid</th>
-                      <th>Collection Rate</th>
-                      <th>Denial Rate</th>
-                      <th>Avg Days to Pay</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {payerPerformance.map((p) => (
-                      <PayerPerformanceRow key={p.payer_id} payer={p} />
-                    ))}
-                  </tbody>
-                </table>
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="font-semibold text-slate-800 text-sm">Payer Performance Overview</h3>
+                <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-full">{payerPerformance.length} Active Payers</span>
               </div>
+              {payerPerformance.length === 0 ? (
+                <div className="text-center py-12 text-slate-400 bg-slate-50 rounded-xl border border-slate-200">
+                  <p>No payer performance data available.</p>
+                </div>
+              ) : (
+                <div className="table-container">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Payer</th>
+                        <th>Charged</th>
+                        <th>Paid</th>
+                        <th>Collection Rate</th>
+                        <th>Denial Rate</th>
+                        <th>Avg Days to Pay</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {payerPerformance.map((p) => (
+                        <PayerPerformanceRow key={p.payer_id} payer={p} />
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>

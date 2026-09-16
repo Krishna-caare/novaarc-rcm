@@ -117,41 +117,59 @@ export function AgingBucket({ label, value, percentage, color }: AgingBucketProp
 interface PayerPerformanceRowProps {
   payer: {
     payer_name:       string;
-    total_charged:    number;
-    total_paid:       number;
-    collection_rate:  number;
-    denial_rate:      number;
-    avg_days_to_pay:  number;
+    total_charged:    number | string;
+    total_paid:       number | string;
+    collection_rate?: number | string | null;
+    denial_rate?:     number | string | null;
+    avg_days_to_pay?: number | string | null;
   };
 }
 
 export function PayerPerformanceRow({ payer }: PayerPerformanceRowProps) {
+  const charged = typeof payer.total_charged === 'number' ? payer.total_charged : parseFloat(String(payer.total_charged || 0)) || 0;
+  const paid = typeof payer.total_paid === 'number' ? payer.total_paid : parseFloat(String(payer.total_paid || 0)) || 0;
+  
+  const rawCollection = payer.collection_rate !== undefined && payer.collection_rate !== null
+    ? parseFloat(String(payer.collection_rate))
+    : (charged > 0 ? (paid / charged) * 100 : 0);
+  const collectionRate = isNaN(rawCollection) ? 0 : rawCollection;
+
+  const rawDenial = payer.denial_rate !== undefined && payer.denial_rate !== null
+    ? parseFloat(String(payer.denial_rate))
+    : 0;
+  const denialRate = isNaN(rawDenial) ? 0 : rawDenial;
+
+  const rawDays = payer.avg_days_to_pay !== undefined && payer.avg_days_to_pay !== null
+    ? parseFloat(String(payer.avg_days_to_pay))
+    : 0;
+  const avgDays = isNaN(rawDays) ? 0 : rawDays;
+
   const collectionVariant =
-    payer.collection_rate >= 90 ? 'bg-forest-50 text-forest-700 ring-1 ring-forest-200' :
-    payer.collection_rate >= 70 ? 'bg-amber-50  text-amber-700  ring-1 ring-amber-200'  :
-                                  'bg-crimson-50 text-crimson-700 ring-1 ring-crimson-200';
+    collectionRate >= 90 ? 'bg-forest-50 text-forest-700 ring-1 ring-forest-200' :
+    collectionRate >= 70 ? 'bg-amber-50  text-amber-700  ring-1 ring-amber-200'  :
+                           'bg-crimson-50 text-crimson-700 ring-1 ring-crimson-200';
 
   const denialVariant =
-    payer.denial_rate <= 5  ? 'bg-forest-50 text-forest-700 ring-1 ring-forest-200' :
-    payer.denial_rate <= 15 ? 'bg-amber-50  text-amber-700  ring-1 ring-amber-200'  :
-                              'bg-crimson-50 text-crimson-700 ring-1 ring-crimson-200';
+    denialRate <= 5  ? 'bg-forest-50 text-forest-700 ring-1 ring-forest-200' :
+    denialRate <= 15 ? 'bg-amber-50  text-amber-700  ring-1 ring-amber-200'  :
+                       'bg-crimson-50 text-crimson-700 ring-1 ring-crimson-200';
 
   return (
     <tr className="hover:bg-slate-50/80 transition-colors">
       <td className="px-4 py-3 font-semibold text-slate-900">{payer.payer_name}</td>
-      <td className="px-4 py-3 text-slate-600 font-mono text-sm">{formatCurrency(payer.total_charged)}</td>
-      <td className="px-4 py-3 text-slate-600 font-mono text-sm">{formatCurrency(payer.total_paid)}</td>
+      <td className="px-4 py-3 text-slate-600 font-mono text-sm">{formatCurrency(charged)}</td>
+      <td className="px-4 py-3 text-slate-600 font-mono text-sm">{formatCurrency(paid)}</td>
       <td className="px-4 py-3">
         <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold', collectionVariant)}>
-          {formatPercent(payer.collection_rate)}
+          {formatPercent(collectionRate)}
         </span>
       </td>
       <td className="px-4 py-3">
         <span className={cn('inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold', denialVariant)}>
-          {formatPercent(payer.denial_rate)}
+          {formatPercent(denialRate)}
         </span>
       </td>
-      <td className="px-4 py-3 text-slate-600 text-sm">{payer.avg_days_to_pay.toFixed(1)} days</td>
+      <td className="px-4 py-3 text-slate-600 text-sm">{avgDays.toFixed(1)} days</td>
     </tr>
   );
 }

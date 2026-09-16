@@ -4,11 +4,11 @@ from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from decimal import Decimal
 from typing import Optional
-from datetime import date
+from datetime import date, datetime
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
-from app.models import Payment as PaymentModel, Claim as ClaimModel
+from app.models import Payment as PaymentModel, Claim as ClaimModel, ClaimStatus
 from app.schemas import PaymentCreate, PaymentUpdate, Payment as PaymentSchema
 
 router = APIRouter()
@@ -47,6 +47,28 @@ async def list_payments(
     db: AsyncSession = Depends(get_db),
     current_user = Depends(get_current_active_user)
 ):
+    # Auto-sync any claims that are marked as paid but don't have a Payment record yet
+    try:
+        pay_claim_ids = select(PaymentModel.claim_id)
+        unmatched_res = await db.execute(
+            select(ClaimModel).where(
+                ClaimModel.status == ClaimStatus.paid,
+                ~ClaimModel.claim_id.in_(pay_claim_ids)
+            )
+        )
+        unmatched_claims = unmatched_res.scalars().all()
+        if unmatched_claims:
+            for c in unmatched_claims:
+                db.add(PaymentModel(
+                    claim_id=c.claim_id,
+                    amount=c.paid_amount or c.charge_amount,
+                    posted_date=date.today(),
+                    remittance_ref=f"ERA-{c.claim_id}-{int(datetime.utcnow().timestamp())}",
+                    payer_id=c.payer_id,
+                ))
+            await db.commit()
+    except Exception:
+        pass
     query = select(PaymentModel).options(
         selectinload(PaymentModel.claim).selectinload(ClaimModel.patient),
         selectinload(PaymentModel.claim).selectinload(ClaimModel.provider),
