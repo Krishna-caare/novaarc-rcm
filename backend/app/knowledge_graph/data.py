@@ -11,7 +11,7 @@ CATEGORIES: List[Dict[str, Any]] = [
     {
         "id": "CAT_MISSING_INFO",
         "name": "Missing Information & Documentation",
-        "description": "Claims denied due to absent clinical documentation, invoices, missing modifiers, or incomplete claim form fields.",
+        "description": "Claims denied due to absent clinical documentation, medical review findings, missing modifiers, invoices, or incomplete claim form fields.",
         "color": "#3b82f6",  # Blue
     },
     {
@@ -60,6 +60,9 @@ CATEGORIES: List[Dict[str, Any]] = [
 
 # Complete Knowledge Base of Denial Scenarios
 DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
+    # =========================================================================
+    # CATEGORY: MISSING INFORMATION & DOCUMENTATION
+    # =========================================================================
     "CO-16": {
         "code": "CO-16",
         "category_id": "CAT_MISSING_INFO",
@@ -147,6 +150,252 @@ DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
         ]
     },
 
+    "CO-216": {
+        "code": "CO-216",
+        "category_id": "CAT_MISSING_INFO",
+        "description": "Claim/service denied based on the findings of a utilization review organization or medical review team due to insufficient or unsubmitted clinical records.",
+        "short_name": "Review Organization / Medical Records Review",
+        "scenarios": [
+            {
+                "id": "CO-216-ADR-AUDIT",
+                "title": "Medical Records Requested in Additional Documentation Request (ADR) Not Received",
+                "root_cause": "Payer medical review organization (RAC, CERT, UPIC, or Commercial Special Investigations Unit) sent an ADR notice that went unanswered or records were delayed past the deadline.",
+                "investigation_steps": [
+                    "Check ADR Log: Was an Additional Documentation Request letter received with an ADR Tracking ID?",
+                    "Verify the deadline: Did the 30/45-day response window lapse prior to record transmission?",
+                    "Check patient record: Is the complete chart available with authenticated physician notes, diagnostic results, and signed treatment plan?",
+                ],
+                "call_script": {
+                    "question_1": "Can you verify the ADR notice generation date, the tracking number, and the specific records requested by the medical review team?",
+                    "question_2": "What is the dedicated medical review fax number or secure portal upload URL to transmit these audit records?",
+                    "question_3": "Can the review department grant a 14-day extension if initial records were mailed timely with delivery receipt?",
+                    "question_4": "What is the representative name, call reference number, and turnaround time once records are uploaded?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500 / Medical Review ADR Packet",
+                    "box_number": "Box 19 (Attachment Control #) / PWK Segment",
+                    "required_documents": [
+                        "Complete Clinical Chart with Attending Physician Signatures",
+                        "Diagnostic Test Results & Lab Reports",
+                        "ADR Cover Letter with Tracking Number & Provider NPI",
+                        "Itemized Charge Breakdown"
+                    ],
+                },
+                "action_plan": [
+                    "Step 1: Retrieve complete encounter documentation, physician progress notes, and signed orders from EHR.",
+                    "Step 2: Attach the original ADR notification cover letter displaying the claim control and audit tracking number.",
+                    "Step 3: Upload directly via the payer's secure provider portal or fax to dedicated Medical Review department.",
+                    "Step 4: Obtain confirmation transmission receipt and diary follow-up for 30-45 days for review adjudication.",
+                ],
+                "standard_notes": "CALL STATUS: Claim denied CO-216 per Medical Review findings. ADR issued on [ADRDate] for complete clinical notes. Pulled chart with signed physician notes and diagnostic results. Uploaded to payer medical review portal with tracking ID [TrackID]. Follow up in 30 days."
+            },
+            {
+                "id": "CO-216-INSUFFICIENT-DOC",
+                "title": "Insufficient Documentation to Support Billed Level of Service",
+                "root_cause": "The clinical documentation submitted did not sufficiently substantiate the medical complexity, intensity of service, or level of E/M billed.",
+                "investigation_steps": [
+                    "Review clinical chart: Did physician document History of Present Illness (HPI), exam elements, and Medical Decision Making (MDM) corresponding to billed CPT?",
+                    "Compare documentation against payer-specific Local Coverage Determination (LCD) or Clinical Policy Bulletin (CPB).",
+                    "Check if physician addendum or peer-to-peer review is permitted for this claim.",
+                ],
+                "call_script": {
+                    "question_1": "Which specific clinical component (MDM, time, or procedure notes) was determined insufficient by the medical reviewer?",
+                    "question_2": "Does the plan allow a formal redetermination appeal with supplemental physician notes?",
+                    "question_3": "What is the deadline and submission address for the formal clinical appeals department?",
+                },
+                "form_requirements": {
+                    "form_name": "First-Level Redetermination Appeal Form",
+                    "box_number": "Box 21 (Diagnosis Codes) & Box 24D (CPT/Modifiers)",
+                    "required_documents": [
+                        "Letter of Medical Necessity signed by Attending Physician",
+                        "Physician Addendum clarifying clinical complexity",
+                        "Complete Inpatient/Outpatient Chart Notes",
+                        "Relevant Peer-Reviewed Literature or LCD Guidelines"
+                    ],
+                },
+                "action_plan": [
+                    "Step 1: Coordinate with billing physician to prepare a clinical addendum clarifying patient acuity and MDM.",
+                    "Step 2: Draft a formal Level-1 Redetermination Appeal citing specific payer policy criteria met.",
+                    "Step 3: Submit the clinical appeal packet with medical records via certified mail or portal dispute mechanism.",
+                    "Step 4: Set follow-up task for 45-60 days to track appeal determination.",
+                ],
+                "standard_notes": "STATUS: Denied CO-216 for insufficient documentation. Coordinated with physician; clinical addendum drafted addressing medical complexity. Compiled Level-1 Redetermination Appeal with LCD citations. Submitted to appeals dept. Next follow-up: 45 days."
+            }
+        ]
+    },
+
+    "CO-226": {
+        "code": "CO-226",
+        "category_id": "CAT_MISSING_INFO",
+        "description": "Information requested from the billing/rendering provider was not provided, not provided timely, or was insufficient/incomplete.",
+        "short_name": "Provider Information Incomplete / Not Provided",
+        "scenarios": [
+            {
+                "id": "CO-226-UNANSWERED-LETTER",
+                "title": "Unanswered Payer Development Request / Itemized Invoice Needed",
+                "root_cause": "Payer sent development questionnaire requesting manufacturer implant invoice, unlisted CPT description, or W-9 form that was not received.",
+                "investigation_steps": [
+                    "Check correspondence log: Was a provider development letter received requesting specific line item invoices?",
+                    "Verify if unlisted CPT code (e.g., 22899, 99499) was billed without an itemized manufacturer invoice or detailed narrative.",
+                ],
+                "call_script": {
+                    "question_1": "What specific document or information was requested in your development letter for this claim?",
+                    "question_2": "What is the fax number or portal upload tab to send the requested invoice/records?",
+                    "question_3": "Can the claim be reopened upon receipt of this information without filing a formal appeal?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500 / Provider Development Packet",
+                    "box_number": "Box 19 (Narrative / Attachment Control) & Box 24D",
+                    "required_documents": ["Manufacturer Implant/Device Acquisition Invoice", "Operative Summary detailing unlisted procedure"],
+                },
+                "action_plan": [
+                    "Step 1: Obtain the vendor device invoice and operative summary from materials management.",
+                    "Step 2: Fax the requested invoice with the original payer development letter as the cover sheet.",
+                    "Step 3: Call payer in 14 days to confirm document indexing and request phone reprocessing.",
+                ],
+                "standard_notes": "STATUS: Denied CO-226 for missing implant invoice. Retrieved vendor invoice from materials management. Faxed with development notice to payer review. Diary set for 14 days."
+            }
+        ]
+    },
+
+    "CO-227": {
+        "code": "CO-227",
+        "category_id": "CAT_MISSING_INFO",
+        "description": "Information requested from the patient/insured was not provided or was insufficient/incomplete.",
+        "short_name": "Patient Information Incomplete / Not Provided",
+        "scenarios": [
+            {
+                "id": "CO-227-PATIENT-QUESTIONNAIRE",
+                "title": "Patient Failed to Respond to Accident / Subrogation Questionnaire",
+                "root_cause": "Payer requires insured patient to complete trauma questionnaire determining auto liability, workers comp, or other insurance responsibility.",
+                "investigation_steps": [
+                    "Check diagnosis codes: Was trauma/accident ICD-10 code (e.g., V-codes, W-codes, Y-codes) billed?",
+                    "Check payer eligibility portal: Is there an open casualty/subrogation hold on the member's account?",
+                ],
+                "call_script": {
+                    "question_1": "Does the payer require the patient to complete an accident questionnaire before claim payment?",
+                    "question_2": "Can provider staff submit the accident details from the clinical notes on the patient's behalf?",
+                    "question_3": "What is the direct member services phone number and mailing address for the questionnaire?",
+                },
+                "form_requirements": {
+                    "form_name": "Patient Accident / Subrogation Questionnaire",
+                    "box_number": "Box 10a-c (Auto / Employment / Other Accident)",
+                    "required_documents": ["Member Accident Questionnaire", "Police Report (if motor vehicle accident)"],
+                },
+                "action_plan": [
+                    "Step 1: Contact patient via phone and portal message informing them insurance is withholding payment pending accident questionnaire.",
+                    "Step 2: Provide patient with payer claim number and direct toll-free questionnaire line.",
+                    "Step 3: If patient confirms injury was not work/auto related, document and notify payer.",
+                    "Step 4: If patient refuses to cooperate within 30 days, transfer responsibility to patient per financial agreement.",
+                ],
+                "standard_notes": "STATUS: Denied CO-227. Insurer holds claim for member accident questionnaire. Contacted patient: instructed to call [PayerPhone] with Claim#[ClaimID]. Placed in 14-day hold queue."
+            }
+        ]
+    },
+
+    "CO-252": {
+        "code": "CO-252",
+        "category_id": "CAT_MISSING_INFO",
+        "description": "An attachment/other documentation is required to adjudicate this claim/service, but was not received or was illegible.",
+        "short_name": "Attachment / Documentation Not Received",
+        "scenarios": [
+            {
+                "id": "CO-252-MISSING-ATTACHMENT",
+                "title": "EDI 275 Attachment or Paper Attachment Not Linked to Claim",
+                "root_cause": "Claim submitted with PWK segment indicator, but clearinghouse or payer did not link the electronic or faxed attachment to the 837 claim file.",
+                "investigation_steps": [
+                    "Check clearinghouse 277 report: Was the Attachment Control Number (ACN) reported in the PWK loop?",
+                    "Verify if attachment was faxed with the mandatory Payer Attachment Barcode Cover Sheet.",
+                ],
+                "call_script": {
+                    "question_1": "Can you check if attachment with Control#[ACN] is received in your document imaging system?",
+                    "question_2": "What is the direct barcode fax number to resend the attachment linked to Claim#[ClaimID]?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500 / EDI PWK Loop 2300",
+                    "box_number": "Box 19 / EDI Loop 2300 PWK Segment",
+                    "required_documents": ["Payer Attachment Barcode Cover Sheet", "Clinical Records / Operative Notes"],
+                },
+                "action_plan": [
+                    "Step 1: Generate payer barcode cover sheet displaying Claim Control # and Attachment Control #.",
+                    "Step 2: Fax documentation with barcode cover sheet to dedicated claims imaging fax.",
+                    "Step 3: Call representative in 7-10 business days to confirm document attachment and request reprocessing.",
+                ],
+                "standard_notes": "STATUS: Denied CO-252. Attachment was not linked. Generated barcoded cover sheet with ACN#[ACN]. Resubmitted records to imaging fax. Follow-up: 10 days."
+            }
+        ]
+    },
+
+    "M119": {
+        "code": "M119",
+        "category_id": "CAT_MISSING_INFO",
+        "description": "Missing/incomplete/invalid/deactivated/withdrawn National Drug Code (NDC).",
+        "short_name": "Missing / Invalid National Drug Code (NDC)",
+        "scenarios": [
+            {
+                "id": "M119-NDC-MISMATCH",
+                "title": "Missing or Invalid 11-Digit NDC on HCPCS J-Code",
+                "root_cause": "Medication billed with J-code (e.g., J0131, J1745) omitted the 11-digit NDC number, unit of measure (UN, ML, GR, F2), or quantity.",
+                "investigation_steps": [
+                    "Check Box 24A shaded area: Is an 11-digit NDC present in 5-4-2 format?",
+                    "Verify NDC qualifier: Is 'N4' preceding the 11-digit NDC code?",
+                    "Verify unit qualifier: Is valid unit of measure (e.g. UN1, ML10) specified?",
+                ],
+                "call_script": {
+                    "question_1": "Does your system require the NDC in 11-digit 5-4-2 configuration without hyphens?",
+                    "question_2": "Can this be corrected via electronic corrected claim (Frequency 7)?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 24A Shaded Top Line (N4 Qualifier + 11-Digit NDC + Unit)",
+                    "required_documents": ["Corrected Claim with valid NDC from vial/packaging"],
+                },
+                "action_plan": [
+                    "Step 1: Check medication package or inventory log for exact 11-digit NDC number.",
+                    "Step 2: Format NDC with qualifier N4 in Box 24A top shaded section, followed by unit qualifier (e.g., UN) and quantity.",
+                    "Step 3: Submit electronic corrected claim with Claim Frequency Code 7.",
+                ],
+                "standard_notes": "STATUS: Denied M119 for NDC. Retrieved valid 11-digit NDC #[NDCNum] from drug inventory. Corrected Box 24A with N4 qualifier and UN unit. Resubmitted electronically."
+            }
+        ]
+    },
+
+    "MA120": {
+        "code": "MA120",
+        "category_id": "CAT_MISSING_INFO",
+        "description": "Missing/incomplete/invalid CLIA certification number.",
+        "short_name": "Missing / Invalid CLIA Number",
+        "scenarios": [
+            {
+                "id": "MA120-CLIA-MISSING",
+                "title": "CLIA Certificate Number Omitted from Laboratory Claim",
+                "root_cause": "In-office laboratory test (e.g., CPT 81002, 87880, 85025) billed without the 10-digit CLIA number in Box 23.",
+                "investigation_steps": [
+                    "Check Box 23: Is the practice's 10-character CLIA certificate number present?",
+                    "Check CLIA Certificate type: Does certificate cover the specific complexity (Waived, Moderate, High) of the billed CPT?",
+                ],
+                "call_script": {
+                    "question_1": "Can you verify if our CLIA number is on file with your provider credentialing department?",
+                    "question_2": "Will adding the CLIA number to Box 23 allow claim reprocessing via electronic corrected claim?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 23 (Prior Auth / CLIA Number)",
+                    "required_documents": ["CMS CLIA Certificate of Waiver / Compliance"],
+                },
+                "action_plan": [
+                    "Step 1: Insert 10-character CLIA certificate number into Box 23 of CMS-1500.",
+                    "Step 2: Append QW modifier if test is designated CLIA-waived under CMS regulations.",
+                    "Step 3: Resubmit as electronic corrected claim.",
+                ],
+                "standard_notes": "STATUS: Denied MA120. CLIA #[CLIANum] inserted into Box 23. Appended modifier QW to lab CPT. Transmitted as corrected claim."
+            }
+        ]
+    },
+
+    # =========================================================================
+    # CATEGORY: PRIOR AUTHORIZATION & REFERRALS
+    # =========================================================================
     "CO-197": {
         "code": "CO-197",
         "category_id": "CAT_PRIOR_AUTH",
@@ -207,6 +456,75 @@ DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
         ]
     },
 
+    "CO-198": {
+        "code": "CO-198",
+        "category_id": "CAT_PRIOR_AUTH",
+        "description": "Precertification/Authorization exceeded (units or days).",
+        "short_name": "Authorization Exceeded",
+        "scenarios": [
+            {
+                "id": "CO-198-UNITS-EXCEEDED",
+                "title": "Billed Units Exceeded Authorized Quantity",
+                "root_cause": "Authorization was granted for 4 therapy sessions or 2 drug units, but 6 were rendered and billed.",
+                "investigation_steps": [
+                    "Check original auth letter: How many units/visits were approved?",
+                    "Check billing history: Have previous claims already consumed authorized units?",
+                ],
+                "call_script": {
+                    "question_1": "How many units were approved under auth #[AuthNum], and how many units have been paid to date?",
+                    "question_2": "Can the provider submit an authorization extension request for the additional medically necessary units?",
+                },
+                "form_requirements": {
+                    "form_name": "Prior Authorization Modification Request",
+                    "box_number": "Box 24G (Days or Units)",
+                    "required_documents": ["Physician Treatment Plan", "Clinical Progress Notes showing ongoing medical necessity"],
+                },
+                "action_plan": [
+                    "Step 1: Request an authorization amendment/extension from the clinical utilization department.",
+                    "Step 2: If amended, rebill unpaid units with amended authorization ID.",
+                    "Step 3: If amendment denied, appeal with documentation of unexpected surgical complexity or patient condition.",
+                ],
+                "standard_notes": "STATUS: Denied CO-198 for units exceeded. Submitted authorization modification request for 2 additional units with clinical chart notes. Follow-up: 14 days."
+            }
+        ]
+    },
+
+    "CO-15": {
+        "code": "CO-15",
+        "category_id": "CAT_PRIOR_AUTH",
+        "description": "Payment adjusted because the submitted authorization was not obtained.",
+        "short_name": "Authorization Not Obtained",
+        "scenarios": [
+            {
+                "id": "CO-15-NO-AUTH",
+                "title": "Missing Referral or Pre-Certification from Primary Care Physician (PCP)",
+                "root_cause": "HMO/POS plan requires referral from assigned PCP before specialist consultation.",
+                "investigation_steps": [
+                    "Check if patient's policy is HMO requiring PCP referral.",
+                    "Check if PCP issued a referral number prior to the specialist visit.",
+                ],
+                "call_script": {
+                    "question_1": "Does this member have an active PCP referral on file covering the specialist consultation on [DOS]?",
+                    "question_2": "Can PCP submit a retroactive referral to allow claim reprocessing?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 17 (Name of Referring Provider) & Box 17b (NPI)",
+                    "required_documents": ["PCP Referral Letter / Authorization Slip"],
+                },
+                "action_plan": [
+                    "Step 1: Contact PCP office to obtain copy of referral or request retroactive referral submission.",
+                    "Step 2: Enter referral # into Box 23 and PCP NPI into Box 17b.",
+                    "Step 3: Resubmit claim for adjudication.",
+                ],
+                "standard_notes": "STATUS: Denied CO-15. Contacted PCP office; obtained referral #[RefNum]. Updated Box 17b and Box 23. Resubmitted claim."
+            }
+        ]
+    },
+
+    # =========================================================================
+    # CATEGORY: TIMELY FILING & DEADLINES
+    # =========================================================================
     "CO-29": {
         "code": "CO-29",
         "category_id": "CAT_TIMELY_FILING",
@@ -234,7 +552,7 @@ DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
                         "Clearinghouse EDI 999 Acceptance Report",
                         "EDI 277 Claim Acknowledgement Report",
                         "CMS-1500 Form copy stamped with original submission date",
-                        "Timely Filing Rebuttal Cover Letter",
+                        "Timely Filing Rebuttal Cover Letter"
                     ],
                 },
                 "action_plan": [
@@ -271,6 +589,9 @@ DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
         ]
     },
 
+    # =========================================================================
+    # CATEGORY: COORDINATION OF BENEFITS (COB)
+    # =========================================================================
     "CO-22": {
         "code": "CO-22",
         "category_id": "CAT_COB",
@@ -329,6 +650,114 @@ DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
         ]
     },
 
+    "CO-23": {
+        "code": "CO-23",
+        "category_id": "CAT_COB",
+        "description": "The impact of prior payer(s) adjudication including payments and/or adjustments.",
+        "short_name": "Prior Payer Adjudication Needed",
+        "scenarios": [
+            {
+                "id": "CO-23-MISSING-PRIMARY-EOB",
+                "title": "Secondary Claim Submitted Without Primary Remittance Information",
+                "root_cause": "Secondary claim submitted electronically without the 837 COB Loop 2320 primary paid amount, allowed amount, and adjustment codes.",
+                "investigation_steps": [
+                    "Check EDI 837 file: Was Loop 2320 (Other Subscriber Information) populated with primary payment details?",
+                    "Verify if primary payer CARC/RARC codes were included in CAS segments.",
+                ],
+                "call_script": {
+                    "question_1": "Did you receive the primary payment and adjustment breakdown with this secondary submission?",
+                    "question_2": "Can we fax or upload the primary EOB directly to your secondary claims processing unit?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500 / Secondary 837P",
+                    "box_number": "Box 29 (Amount Paid) & Loop 2320",
+                    "required_documents": ["Complete Primary Explanation of Benefits (EOB)"],
+                },
+                "action_plan": [
+                    "Step 1: Ensure primary EOB amounts and CARC adjustments are mapped into billing software.",
+                    "Step 2: Re-transmit secondary claim electronically with complete Loop 2320 and 2430 details.",
+                ],
+                "standard_notes": "STATUS: Denied CO-23. Re-entered primary payment and adjustment amounts into billing software. Resubmitted clean secondary claim."
+            }
+        ]
+    },
+
+    # =========================================================================
+    # CATEGORY: MEDICAL NECESSITY & LEVEL OF SERVICE
+    # =========================================================================
+    "CO-50": {
+        "code": "CO-50",
+        "category_id": "CAT_MEDICAL_NECESSITY",
+        "description": "These are non-covered services because this is not deemed a 'medical necessity' by the payer.",
+        "short_name": "Not Deemed Medically Necessary",
+        "scenarios": [
+            {
+                "id": "CO-50-LCD-NCD-APPEAL",
+                "title": "Medical Necessity Dispute Citing LCD/NCD Coverage Policies",
+                "root_cause": "Billed diagnosis code is not covered under the payer's Local Coverage Determination (LCD) or clinical policy bulletin.",
+                "investigation_steps": [
+                    "Search CMS Medicare Coverage Database or payer policy bulletin for CPT and allowable ICD-10 codes.",
+                    "Review physician encounter notes: Did patient exhibit qualifying symptoms/diagnoses that were omitted?",
+                ],
+                "call_script": {
+                    "question_1": "Which specific Clinical Policy Bulletin or LCD was applied to deny this service?",
+                    "question_2": "What is the deadline and fax number for physician peer-to-peer review or formal clinical appeal?",
+                },
+                "form_requirements": {
+                    "form_name": "Formal Clinical Appeal Packet",
+                    "box_number": "Box 21 (Diagnosis Codes)",
+                    "required_documents": [
+                        "Letter of Medical Necessity signed by Physician",
+                        "Complete Clinical Chart Notes & Diagnostic Lab/Imaging Reports",
+                        "Copy of Relevant LCD / Clinical Policy Bulletin"
+                    ],
+                },
+                "action_plan": [
+                    "Step 1: Review clinical notes to determine if a secondary covered diagnosis code was documented but unbilled.",
+                    "Step 2: If unbilled covered diagnosis exists in chart, submit corrected claim.",
+                    "Step 3: If coding was accurate, generate clinical appeal citing physician rationale and peer-reviewed guidelines.",
+                    "Step 4: Offer attending physician the option for peer-to-peer review with payer medical director.",
+                ],
+                "standard_notes": "STATUS: Denied CO-50 medical necessity. Reviewed chart notes and LCD guidelines. Drafted clinical appeal packet with physician letter of necessity and clinical notes. Submitted to payer appeals dept."
+            }
+        ]
+    },
+
+    "CO-55": {
+        "code": "CO-55",
+        "category_id": "CAT_MEDICAL_NECESSITY",
+        "description": "Procedure/treatment/drug is deemed experimental/investigational by the payer.",
+        "short_name": "Experimental / Investigational Service",
+        "scenarios": [
+            {
+                "id": "CO-55-EXPERIMENTAL",
+                "title": "Procedure Denied as Investigational / Off-Label Use",
+                "root_cause": "Payer policy considers new surgical technique or off-label drug therapy experimental without FDA approval for that specific indication.",
+                "investigation_steps": [
+                    "Check FDA approval status and compendia listings (NCCN, Micromedex) for the billed drug/device.",
+                    "Check if patient executed an Advance Beneficiary Notice (ABN) or Notice of Non-Coverage prior to treatment.",
+                ],
+                "call_script": {
+                    "question_1": "Does the payer accept clinical appeal packets with peer-reviewed medical journals proving standard of care?",
+                    "question_2": "What is the second-level external review deadline if the internal appeal is upheld?",
+                },
+                "form_requirements": {
+                    "form_name": "Experimental Clinical Appeal Packet",
+                    "box_number": "Box 24D",
+                    "required_documents": ["Peer-reviewed journal studies", "Letter of Medical Necessity", "FDA approval letter / compendia excerpt"],
+                },
+                "action_plan": [
+                    "Step 1: Gather clinical evidence and peer-reviewed oncology/surgical literature supporting efficacy.",
+                    "Step 2: Submit comprehensive medical appeal packet to payer clinical review panel.",
+                ],
+                "standard_notes": "STATUS: Denied CO-55. Assembled medical literature and physician letter supporting efficacy. Submitted formal appeal to clinical dispute committee."
+            }
+        ]
+    },
+
+    # =========================================================================
+    # CATEGORY: CODING, INCONSISTENCIES & MODIFIER EDITS
+    # =========================================================================
     "CO-4": {
         "code": "CO-4",
         "category_id": "CAT_CODING_MODIFIERS",
@@ -362,6 +791,108 @@ DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
         ]
     },
 
+    "CO-5": {
+        "code": "CO-5",
+        "category_id": "CAT_CODING_MODIFIERS",
+        "description": "The procedure code/type of bill is inconsistent with the place of service.",
+        "short_name": "Place of Service Inconsistent with Procedure",
+        "scenarios": [
+            {
+                "id": "CO-5-POS-MISMATCH",
+                "title": "Hospital-Only Procedure Billed with Office POS (11) or Vice Versa",
+                "root_cause": "CPT code can only be performed in inpatient facility (POS 21) or ambulatory surgical center (POS 24), but was billed with POS 11 (Office).",
+                "investigation_steps": [
+                    "Check CPT guidelines: What are the valid CMS Place of Service codes for this procedure?",
+                    "Verify Box 24B on CMS-1500 against encounter facility records.",
+                ],
+                "call_script": {
+                    "question_1": "Can you verify the allowable Place of Service codes for CPT [CPTCode]?",
+                    "question_2": "Will correcting Box 24B to the accurate facility code resolve the denial?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 24B (Place of Service)",
+                    "required_documents": ["Facility Encounter Log"],
+                },
+                "action_plan": [
+                    "Step 1: Confirm exact physical location where service was rendered.",
+                    "Step 2: Update Box 24B with valid POS (e.g., 22 for Outpatient Hospital, 24 for ASC).",
+                    "Step 3: Resubmit corrected claim.",
+                ],
+                "standard_notes": "STATUS: Denied CO-5. Updated Place of Service in Box 24B from 11 to 22 per hospital records. Resubmitted corrected claim."
+            }
+        ]
+    },
+
+    "CO-8": {
+        "code": "CO-8",
+        "category_id": "CAT_CODING_MODIFIERS",
+        "description": "The procedure code is inconsistent with the provider type/specialty (taxonomy).",
+        "short_name": "Provider Specialty / Taxonomy Inconsistent",
+        "scenarios": [
+            {
+                "id": "CO-8-TAXONOMY-SPECIALTY",
+                "title": "Specialty Billing Restriction Mismatch",
+                "root_cause": "CPT restricted to specific medical specialty (e.g., cardiology, ophthalmology) billed under a general provider taxonomy.",
+                "investigation_steps": [
+                    "Check NPPES NPI Registry for rendering provider primary and secondary taxonomy codes.",
+                    "Verify if mid-level modifier (SA, SA, AF) is required for nurse practitioner or physician assistant.",
+                ],
+                "call_script": {
+                    "question_1": "What specialty or taxonomy code does your enrollment department require for this procedure code?",
+                    "question_2": "Can the rendering provider's secondary enrolled taxonomy be submitted in Box 24J qualifier ZZ?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 24J & Box 33b (Taxonomy Code with ZZ Qualifier)",
+                    "required_documents": ["Provider Specialty Board Certification"],
+                },
+                "action_plan": [
+                    "Step 1: Check payer enrollment file for approved provider taxonomies.",
+                    "Step 2: Append appropriate modifier or update Box 24J with registered taxonomy code.",
+                    "Step 3: Resubmit claim.",
+                ],
+                "standard_notes": "STATUS: Denied CO-8. Updated Box 24J with enrolled specialty taxonomy code [TaxonomyCode]. Resubmitted claim."
+            }
+        ]
+    },
+
+    "CO-11": {
+        "code": "CO-11",
+        "category_id": "CAT_CODING_MODIFIERS",
+        "description": "The diagnosis is inconsistent with the procedure.",
+        "short_name": "Diagnosis Inconsistent with Procedure",
+        "scenarios": [
+            {
+                "id": "CO-11-DX-POINTER",
+                "title": "Incorrect Diagnosis Pointer in Box 24E",
+                "root_cause": "The diagnosis code entered in Box 21 does not justify the CPT code on line 24, or Box 24E pointed to an unrelated diagnosis.",
+                "investigation_steps": [
+                    "Check Box 24E: Does diagnosis pointer letter (A-L) point to the clinical condition treated by this procedure?",
+                    "Check payer LCD: Is the pointed diagnosis code listed on the covered ICD-10 list?",
+                ],
+                "call_script": {
+                    "question_1": "Can you advise which diagnosis pointers were linked to line item [LineNum] during adjudication?",
+                    "question_2": "Does your coverage policy accept ICD-10 [ICDCode] as medically justifiable for this CPT?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 24E (Diagnosis Pointer) & Box 21 (ICD-10 Codes)",
+                    "required_documents": ["Clinical Chart Notes verifying diagnosis"],
+                },
+                "action_plan": [
+                    "Step 1: Review medical records and link primary symptom/disease diagnosis to procedure in Box 24E.",
+                    "Step 2: Ensure correct order of diagnosis codes in Box 21.",
+                    "Step 3: Resubmit as corrected claim.",
+                ],
+                "standard_notes": "STATUS: Denied CO-11. Corrected Box 24E diagnosis pointer from 'B' to 'A' to link covered ICD-10 code. Re-transmitted claim."
+            }
+        ]
+    },
+
+    # =========================================================================
+    # CATEGORY: DUPLICATE, BUNDLING & NCCI EDITS
+    # =========================================================================
     "CO-18": {
         "code": "CO-18",
         "category_id": "CAT_DUPLICATE_BUNDLING",
@@ -416,6 +947,104 @@ DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
         ]
     },
 
+    "CO-97": {
+        "code": "CO-97",
+        "category_id": "CAT_DUPLICATE_BUNDLING",
+        "description": "The benefit for this service is included in the payment/allowance for another service/procedure that has already been adjudicated.",
+        "short_name": "Bundled / Inclusive Service (NCCI Edit)",
+        "scenarios": [
+            {
+                "id": "CO-97-UNBUNDLING-MOD-59",
+                "title": "Separate Procedure Eligible for Modifier 59 / X(EPSU)",
+                "root_cause": "Procedure bundled under NCCI PTP (Procedure-to-Procedure) edits, but was performed at a distinct anatomical site or session.",
+                "investigation_steps": [
+                    "Check NCCI edit table: Is the edit modifier indicator '1' (modifier permitted)?",
+                    "Verify chart: Did procedure occur at a separate lesion, distinct incision, or separate encounter?",
+                ],
+                "call_script": {
+                    "question_1": "Is this code bundled with CPT [PrimaryCPT] under CMS NCCI edits?",
+                    "question_2": "If supported by chart notes as a distinct site, will appending Modifier 59/XS allow unbundling?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 24D (Modifier Column)",
+                    "required_documents": ["Operative Report with distinct site highlighted"],
+                },
+                "action_plan": [
+                    "Step 1: Verify NCCI indicator allows modifier (Modifier indicator 1).",
+                    "Step 2: Append Modifier 59 or specific X-modifier (XE, XS, XP, XU) to secondary procedure.",
+                    "Step 3: Submit corrected claim with frequency code 7.",
+                ],
+                "standard_notes": "STATUS: Denied CO-97 bundled service. NCCI indicator allows modifier. Documentation confirms separate site. Appended Modifier 59 in Box 24D and resubmitted corrected claim."
+            }
+        ]
+    },
+
+    "CO-45": {
+        "code": "CO-45",
+        "category_id": "CAT_DUPLICATE_BUNDLING",
+        "description": "Charge exceeds fee schedule/maximum allowable or contracted/legislated fee arrangement.",
+        "short_name": "Contractual Fee Schedule Adjustment",
+        "scenarios": [
+            {
+                "id": "CO-45-CONTRACTUAL-ADJUSTMENT",
+                "title": "Normal In-Network Contractual Write-Off",
+                "root_cause": "The difference between provider billed charge and payer negotiated allowable fee.",
+                "investigation_steps": [
+                    "Compare payment received + patient copay/coinsurance against provider fee schedule contract.",
+                    "Verify that write-off amount matches contractual discount percentage.",
+                ],
+                "call_script": {
+                    "question_1": "Can you verify the allowable amount for CPT [CPTCode] under provider agreement?",
+                },
+                "form_requirements": {
+                    "form_name": "Remittance Advice Posting",
+                    "box_number": "N/A",
+                    "required_documents": ["Provider Fee Schedule Matrix"],
+                },
+                "action_plan": [
+                    "Step 1: Verify payment against contracted fee schedule.",
+                    "Step 2: Post CO-45 write-off adjustment to patient ledger (cannot balance bill patient).",
+                ],
+                "standard_notes": "STATUS: Processed CO-45. Standard contractual adjustment verified against fee schedule. Posted adjustment to ledger. Patient balance adjusted."
+            }
+        ]
+    },
+
+    "CO-234": {
+        "code": "CO-234",
+        "category_id": "CAT_DUPLICATE_BUNDLING",
+        "description": "This procedure is not paid separately.",
+        "short_name": "Procedure Not Paid Separately",
+        "scenarios": [
+            {
+                "id": "CO-234-INCIDENTAL",
+                "title": "Incidental Component of Primary Procedure",
+                "root_cause": "Supply, surgical tray, or incidental minor procedure deemed part of the primary operative fee.",
+                "investigation_steps": [
+                    "Check CMS Physician Fee Schedule Relative Value File: Is status indicator 'B' (Bundled)?",
+                    "Verify if procedure was distinct and eligible for unbundling modifier.",
+                ],
+                "call_script": {
+                    "question_1": "Is CPT [CPTCode] considered bundled under all circumstances, or is an override modifier permitted?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 24D",
+                    "required_documents": ["Operative Report"],
+                },
+                "action_plan": [
+                    "Step 1: If code has CMS Status B with no modifier exemption, adjust balance as contractual bundle.",
+                    "Step 2: If clinical exception applies, submit chart notes on appeal.",
+                ],
+                "standard_notes": "STATUS: Denied CO-234 incidental service. CMS status verified as bundled. Posted contractual adjustment."
+            }
+        ]
+    },
+
+    # =========================================================================
+    # CATEGORY: ELIGIBILITY, IDENTIFICATION & TERMINATION
+    # =========================================================================
     "CO-26": {
         "code": "CO-26",
         "category_id": "CAT_ELIGIBILITY",
@@ -481,137 +1110,67 @@ DENIAL_KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
         ]
     },
 
-    "CO-50": {
-        "code": "CO-50",
-        "category_id": "CAT_MEDICAL_NECESSITY",
-        "description": "These are non-covered services because this is not deemed a 'medical necessity' by the payer.",
-        "short_name": "Not Deemed Medically Necessary",
-        "scenarios": [
-            {
-                "id": "CO-50-LCD-NCD-APPEAL",
-                "title": "Medical Necessity Dispute Citing LCD/NCD Coverage Policies",
-                "root_cause": "Billed diagnosis code is not covered under the payer's Local Coverage Determination (LCD) or clinical policy bulletin.",
-                "investigation_steps": [
-                    "Search CMS Medicare Coverage Database or payer policy bulletin for CPT and allowable ICD-10 codes.",
-                    "Review physician encounter notes: Did patient exhibit qualifying symptoms/diagnoses that were omitted?",
-                ],
-                "call_script": {
-                    "question_1": "Which specific Clinical Policy Bulletin or LCD was applied to deny this service?",
-                    "question_2": "What is the deadline and fax number for physician peer-to-peer review or formal clinical appeal?",
-                },
-                "form_requirements": {
-                    "form_name": "Formal Clinical Appeal Packet",
-                    "box_number": "Box 21 (Diagnosis Codes)",
-                    "required_documents": [
-                        "Letter of Medical Necessity signed by Physician",
-                        "Complete Clinical Chart Notes & Diagnostic Lab/Imaging Reports",
-                        "Copy of Relevant LCD / Clinical Policy Bulletin",
-                    ],
-                },
-                "action_plan": [
-                    "Step 1: Review clinical notes to determine if a secondary covered diagnosis code was documented but unbilled.",
-                    "Step 2: If unbilled covered diagnosis exists in chart, submit corrected claim.",
-                    "Step 3: If coding was accurate, generate clinical appeal citing physician rationale and peer-reviewed guidelines.",
-                    "Step 4: Offer attending physician the option for peer-to-peer review with payer medical director.",
-                ],
-                "standard_notes": "STATUS: Denied CO-50 medical necessity. Reviewed chart notes and LCD guidelines. Drafted clinical appeal packet with physician letter of necessity and clinical notes. Submitted to payer appeals dept."
-            }
-        ]
-    },
-
-    "CO-97": {
-        "code": "CO-97",
-        "category_id": "CAT_DUPLICATE_BUNDLING",
-        "description": "The benefit for this service is included in the payment/allowance for another service/procedure that has already been adjudicated.",
-        "short_name": "Bundled / Inclusive Service (NCCI Edit)",
-        "scenarios": [
-            {
-                "id": "CO-97-UNBUNDLING-MOD-59",
-                "title": "Separate Procedure Eligible for Modifier 59 / X(EPSU)",
-                "root_cause": "Procedure bundled under NCCI PTP (Procedure-to-Procedure) edits, but was performed at a distinct anatomical site or session.",
-                "investigation_steps": [
-                    "Check NCCI edit table: Is the edit modifier indicator '1' (modifier permitted)?",
-                    "Verify chart: Did procedure occur at a separate lesion, distinct incision, or separate encounter?",
-                ],
-                "call_script": {
-                    "question_1": "Is this code bundled with CPT [PrimaryCPT] under CMS NCCI edits?",
-                    "question_2": "If supported by chart notes as a distinct site, will appending Modifier 59/XS allow unbundling?",
-                },
-                "form_requirements": {
-                    "form_name": "CMS-1500",
-                    "box_number": "Box 24D (Modifier Column)",
-                    "required_documents": ["Operative Report with distinct site highlighted"],
-                },
-                "action_plan": [
-                    "Step 1: Verify NCCI indicator allows modifier (Modifier indicator 1).",
-                    "Step 2: Append Modifier 59 or specific X-modifier (XE, XS, XP, XU) to secondary procedure.",
-                    "Step 3: Submit corrected claim with frequency code 7.",
-                ],
-                "standard_notes": "STATUS: Denied CO-97 bundled service. NCCI indicator allows modifier. Documentation confirms separate site. Appended Modifier 59 in Box 24D and resubmitted corrected claim."
-            }
-        ]
-    },
-
-    "CO-45": {
-        "code": "CO-45",
-        "category_id": "CAT_DUPLICATE_BUNDLING",
-        "description": "Charge exceeds fee schedule/maximum allowable or contracted/legislated fee arrangement.",
-        "short_name": "Contractual Fee Schedule Adjustment",
-        "scenarios": [
-            {
-                "id": "CO-45-CONTRACTUAL-ADJUSTMENT",
-                "title": "Normal In-Network Contractual Write-Off",
-                "root_cause": "The difference between provider billed charge and payer negotiated allowable fee.",
-                "investigation_steps": [
-                    "Compare payment received + patient copay/coinsurance against fee schedule.",
-                    "Verify that the contractual allowance matches provider in-network fee agreement.",
-                ],
-                "call_script": {
-                    "question_1": "Can you verify if allowable calculation is based on standard in-network fee schedule?",
-                },
-                "form_requirements": {
-                    "form_name": "Remittance Advice ERA Posting",
-                    "box_number": "N/A",
-                    "required_documents": ["ERA / 835 Remittance File"],
-                },
-                "action_plan": [
-                    "Step 1: Post the CO-45 amount as a contractual adjustment in the billing system.",
-                    "Step 2: Ensure the adjusted amount is NOT billed to the patient (protected under in-network contract).",
-                ],
-                "standard_notes": "STATUS: Processed CO-45. Standard contractual adjustment verified against fee schedule. Posted adjustment to ledger. Patient balance adjusted."
-            }
-        ]
-    },
-
     "CO-31": {
         "code": "CO-31",
         "category_id": "CAT_ELIGIBILITY",
         "description": "Patient cannot be identified as our insured.",
-        "short_name": "Patient Cannot Be Identified",
+        "short_name": "Patient Not Identified as Insured",
         "scenarios": [
             {
                 "id": "CO-31-ID-MISMATCH",
-                "title": "Typo in Member ID, Name, or Date of Birth",
-                "root_cause": "Member ID missing alpha prefix, typo in policy number, or mismatch in patient legal name / DOB.",
+                "title": "Member ID, Name, or Date of Birth Mismatch",
+                "root_cause": "Typo in member ID, maiden name billed instead of married name, or incorrect date of birth in Box 3.",
                 "investigation_steps": [
-                    "Check physical copy of insurance card in EHR.",
-                    "Compare Cardholder ID, Group #, and Patient DOB against claim Box 1a, Box 2, Box 3.",
+                    "Compare CMS-1500 Box 1a (Insured ID), Box 2 (Patient Name), and Box 3 (DOB) against insurance card copy.",
+                    "Check clearinghouse 270/271 eligibility response for exact subscriber name spelling.",
                 ],
                 "call_script": {
-                    "question_1": "Can you search for the member using their SSN, DOB, and legal name?",
-                    "question_2": "Is there an active alpha prefix or suffix required for member ID [MemberID]?",
+                    "question_1": "Can you locate member using patient SSN, full legal name, and date of birth?",
+                    "question_2": "What is the exact subscriber ID number and suffix active in your system?",
                 },
                 "form_requirements": {
                     "form_name": "CMS-1500",
-                    "box_number": "Box 1a (Insured's ID), Box 2 (Patient Name), Box 3 (DOB)",
-                    "required_documents": ["Front & Back Insurance Card Copy"],
+                    "box_number": "Box 1a (Insured's ID Number), Box 2 (Patient Name), Box 3 (DOB)",
+                    "required_documents": ["Copy of Front & Back of Insurance Card"],
                 },
                 "action_plan": [
-                    "Step 1: Verify correct member ID format with payer or patient.",
-                    "Step 2: Update patient master file in billing system.",
-                    "Step 3: Resubmit clean corrected claim.",
+                    "Step 1: Correct member ID, name spelling, or DOB in patient master file.",
+                    "Step 2: Re-verify real-time 270 eligibility.",
+                    "Step 3: Resubmit as clean claim.",
                 ],
-                "standard_notes": "STATUS: Denied CO-31. Identified typo in Member ID (missing alpha prefix). Corrected Box 1a with [CorrectedID]. Claim resubmitted."
+                "standard_notes": "STATUS: Denied CO-31. Identified typo in Member ID (transposed digits). Corrected Box 1a to [CorrectID]. Electronically rebilled."
+            }
+        ]
+    },
+
+    "CO-109": {
+        "code": "CO-109",
+        "category_id": "CAT_ELIGIBILITY",
+        "description": "Claim/service not covered by this payer/contractor. You must send the claim/service to the correct payer/contractor.",
+        "short_name": "Wrong Payer / Contractor",
+        "scenarios": [
+            {
+                "id": "CO-109-WRONG-PAYER",
+                "title": "Claim Sent to Wrong Payer ID or Sub-Plan",
+                "root_cause": "Claim submitted to regional BCBS instead of out-of-state home plan, or submitted to commercial plan instead of Medicare Advantage carve-out.",
+                "investigation_steps": [
+                    "Check 3-character alpha prefix on BCBS card (BlueCard routing rules).",
+                    "Verify if behavioral health, vision, or chiropractic is carved out to a third-party administrator (TPA).",
+                ],
+                "call_script": {
+                    "question_1": "Which specific payer or sub-contractor is responsible for processing this service?",
+                    "question_2": "What is the correct electronic Payer ID and mailing address?",
+                },
+                "form_requirements": {
+                    "form_name": "CMS-1500",
+                    "box_number": "Box 11c (Insurance Plan Name / Program) & EDI Payer ID",
+                    "required_documents": ["Member Insurance Card with correct Payer ID"],
+                },
+                "action_plan": [
+                    "Step 1: Update billing software with correct electronic Payer ID.",
+                    "Step 2: Submit initial clean claim to the correct payer within timely filing limits.",
+                ],
+                "standard_notes": "STATUS: Denied CO-109 wrong payer. Carved out to [NewPayer]. Re-routed clean claim to correct Payer ID [PayerID]."
             }
         ]
     }
