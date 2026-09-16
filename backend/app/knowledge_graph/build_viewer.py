@@ -1,10 +1,170 @@
 import json
 import os
+import math
+import random
 from app.knowledge_graph.graph_engine import denial_kg
 
 def build_viewer():
     graph_data = denial_kg.to_d3_graph()
-    graph_json = json.dumps(graph_data)
+    raw_nodes = graph_data["nodes"]
+    raw_links = graph_data["links"]
+    categories = graph_data["categories"]
+
+    # 1. Propagate Category IDs to all 354 nodes
+    node_map = {n["id"]: dict(n) for n in raw_nodes}
+    for nid, n in node_map.items():
+        if n["type"] == "category":
+            n["cat_id"] = n["id"]
+        elif n.get("properties") and n["properties"].get("category_id"):
+            n["cat_id"] = n["properties"]["category_id"]
+        else:
+            n["cat_id"] = None
+
+    for _ in range(4):
+        for l in raw_links:
+            src = node_map.get(l["source"])
+            tgt = node_map.get(l["target"])
+            if src and tgt:
+                if src["cat_id"] and not tgt["cat_id"]:
+                    tgt["cat_id"] = src["cat_id"]
+                elif tgt["cat_id"] and not src["cat_id"]:
+                    src["cat_id"] = tgt["cat_id"]
+
+    # 2. Compute 3D Spherical & 2D Coordinates with pristine physics
+    CAT_SPHERICAL_ANCHORS = {}
+    CAT_2D_ANCHORS = {}
+    num_cats = len(categories)
+    for i, c in enumerate(categories):
+        # 3D spherical Fibonacci distribution
+        phi = math.acos(-1.0 + (2.0 * i + 1.0) / num_cats)
+        theta = math.sqrt(num_cats * math.pi) * i
+        CAT_SPHERICAL_ANCHORS[c["id"]] = (
+            math.sin(phi) * math.cos(theta),
+            math.sin(phi) * math.sin(theta),
+            math.cos(phi),
+        )
+        # 2D radial layout
+        angle_2d = (i / num_cats) * math.pi * 2
+        CAT_2D_ANCHORS[c["id"]] = (
+            math.cos(angle_2d) * 190,
+            math.sin(angle_2d) * 190,
+        )
+
+    random.seed(42)
+    node_list = list(node_map.values())
+    for n in node_list:
+        cid = n["cat_id"] or "CAT_MISSING_INFO"
+        ux, uy, uz = CAT_SPHERICAL_ANCHORS.get(cid, (0, 0, 1))
+
+        # Shell radius based on ontological hierarchy
+        if n["type"] == "category":
+            r3 = 280.0
+            r2 = 190.0
+            jitter = 0.0
+        elif n["type"] == "denial_code":
+            r3 = 315.0
+            r2 = 250.0
+            jitter = 0.22
+        elif n["type"] == "scenario":
+            r3 = 350.0
+            r2 = 310.0
+            jitter = 0.38
+        else:
+            r3 = 380.0
+            r2 = 360.0
+            jitter = 0.52
+
+        # 3D Jitter on sphere surface
+        jx = (random.random() - 0.5) * jitter
+        jy = (random.random() - 0.5) * jitter
+        jz = (random.random() - 0.5) * jitter
+        norm = math.sqrt((ux + jx)**2 + (uy + jy)**2 + (uz + jz)**2) or 1.0
+        n["x3"] = round(((ux + jx) / norm) * r3, 2)
+        n["y3"] = round(((uy + jy) / norm) * r3, 2)
+        n["z3"] = round(((uz + jz) / norm) * r3, 2)
+        n["target_r3"] = r3
+
+        # 2D Coordinates around category cluster
+        cx2, cy2 = CAT_2D_ANCHORS.get(cid, (0, 0))
+        angle_off = random.random() * math.pi * 2
+        dist_off = 0 if n["type"] == "category" else (40 + random.random() * (r2 - 190))
+        n["x2"] = round(cx2 + math.cos(angle_off) * dist_off, 2)
+        n["y2"] = round(cy2 + math.sin(angle_off) * dist_off, 2)
+
+    # 3D Relaxation to eliminate overlap & tension
+    node_idx_map = {n["id"]: i for i, n in enumerate(node_list)}
+    resolved_links = []
+    for l in raw_links:
+        if l["source"] in node_idx_map and l["target"] in node_idx_map:
+            resolved_links.append((node_idx_map[l["source"]], node_idx_map[l["target"]]))
+
+    for _ in range(50):
+        # Repulsion
+        for i in range(len(node_list)):
+            a = node_list[i]
+            for j in range(i + 1, min(i + 45, len(node_list))):
+                b = node_list[j]
+                dx = b["x3"] - a["x3"]
+                dy = b["y3"] - a["y3"]
+                dz = b["z3"] - a["z3"]
+                dist = math.sqrt(dx*dx + dy*dy + dz*dz) or 1.0
+                if dist < 24.0:
+                    force = (24.0 - dist) / dist * 0.16
+                    fx, fy, fz = dx * force, dy * force, dz * force
+                    if a["type"] != "category":
+                        a["x3"] -= fx; a["y3"] -= fy; a["z3"] -= fz
+                    if b["type"] != "category":
+                        b["x3"] += fx; b["y3"] += fy; b["z3"] += fz
+
+        # Link springs
+        for si, ti in resolved_links:
+            a = node_list[si]
+            b = node_list[ti]
+            dx = b["x3"] - a["x3"]
+            dy = b["y3"] - a["y3"]
+            dz = b["z3"] - a["z3"]
+            dist = math.sqrt(dx*dx + dy*dy + dz*dz) or 1.0
+            target_d = 30.0 if a["type"] == "category" or b["type"] == "category" else 20.0
+            force = (dist - target_d) * 0.035
+            fx, fy, fz = (dx / dist) * force, (dy / dist) * force, (dz / dist) * force
+            if a["type"] != "category":
+                a["x3"] += fx; a["y3"] += fy; a["z3"] += fz
+            if b["type"] != "category":
+                b["x3"] += fx; b["y3"] += fy; b["z3"] += fz
+
+        # Re-project to spherical shell
+        for n in node_list:
+            if n["type"] == "category":
+                continue
+            r = math.sqrt(n["x3"]**2 + n["y3"]**2 + n["z3"]**2) or 1.0
+            scale = n["target_r3"] / r
+            n["x3"] = round(n["x3"] * scale, 2)
+            n["y3"] = round(n["y3"] * scale, 2)
+            n["z3"] = round(n["z3"] * scale, 2)
+
+    # 2D Relaxation (with symmetric damping to prevent runaway vertical lines)
+    for _ in range(60):
+        for si, ti in resolved_links:
+            a = node_list[si]
+            b = node_list[ti]
+            dx = b["x2"] - a["x2"]
+            dy = b["y2"] - a["y2"]
+            dist = math.sqrt(dx*dx + dy*dy) or 1.0
+            target_d = 45.0 if a["type"] == "category" or b["type"] == "category" else 22.0
+            force = (dist - target_d) * 0.03
+            fx, fy = (dx / dist) * force, (dy / dist) * force
+            if a["type"] != "category":
+                a["x2"] += fx; a["y2"] += fy
+            if b["type"] != "category":
+                b["x2"] -= fx; b["y2"] -= fy
+
+    # Prepare final clean payload
+    clean_graph_data = {
+        "nodes": node_list,
+        "links": raw_links,
+        "categories": categories,
+    }
+    graph_json = json.dumps(clean_graph_data)
 
     html_content = """<!DOCTYPE html>
 <html lang="en">
@@ -15,7 +175,7 @@ def build_viewer():
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
-      background-color: #000000;
+      background-color: #030407;
       color: #e5e7eb;
       font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
       overflow: hidden;
@@ -31,7 +191,7 @@ def build_viewer():
       position: relative;
       height: 100%;
       min-width: 0;
-      background-color: #000000;
+      background: radial-gradient(circle at center, #090b10 0%, #020305 100%);
       overflow: hidden;
     }
 
@@ -43,7 +203,7 @@ def build_viewer():
     }
     canvas:active { cursor: grabbing; }
 
-    /* Top Floating Header & Filter Controls - Obsidian Minimalist Style */
+    /* Top Floating Controls - Obsidian Glassmorphism */
     .top-bar {
       position: absolute;
       top: 14px;
@@ -58,8 +218,8 @@ def build_viewer():
     .top-bar > * { pointer-events: auto; }
 
     .brand-pill {
-      background: rgba(18, 19, 24, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(18, 20, 28, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       padding: 7px 16px;
       border-radius: 6px;
       font-size: 12px;
@@ -68,14 +228,16 @@ def build_viewer():
       display: flex;
       align-items: center;
       gap: 8px;
-      backdrop-filter: blur(12px);
+      backdrop-filter: blur(14px);
       letter-spacing: 0.01em;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     }
     .brand-pill .dot {
-      width: 6px;
-      height: 6px;
+      width: 7px;
+      height: 7px;
       border-radius: 50%;
       background: #3b82f6;
+      box-shadow: 0 0 8px #3b82f6;
     }
 
     .search-wrapper {
@@ -85,22 +247,22 @@ def build_viewer():
     }
     .search-input {
       width: 100%;
-      background: rgba(18, 19, 24, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(18, 20, 28, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
       padding: 7px 14px 7px 32px;
       border-radius: 6px;
       color: #f3f4f6;
       font-size: 12px;
       outline: none;
-      backdrop-filter: blur(12px);
-      transition: border-color 0.15s;
+      backdrop-filter: blur(14px);
+      transition: all 0.15s ease;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
     }
-    .search-input::placeholder {
-      color: #6b7280;
-    }
+    .search-input::placeholder { color: #6b7280; }
     .search-input:focus {
-      border-color: rgba(255, 255, 255, 0.28);
-      background: rgba(24, 26, 32, 0.95);
+      border-color: rgba(59, 130, 246, 0.6);
+      background: rgba(22, 25, 36, 0.95);
+      box-shadow: 0 0 12px rgba(59, 130, 246, 0.25);
     }
     .search-icon {
       position: absolute;
@@ -120,8 +282,8 @@ def build_viewer():
       align-items: center;
     }
     .cat-chip {
-      background: rgba(18, 19, 24, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(18, 20, 28, 0.75);
+      border: 1px solid rgba(255, 255, 255, 0.09);
       padding: 5px 11px;
       border-radius: 5px;
       font-size: 11px;
@@ -133,24 +295,27 @@ def build_viewer():
       gap: 6px;
       backdrop-filter: blur(10px);
       transition: all 0.15s ease;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     .cat-chip .dot {
-      width: 5px;
-      height: 5px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
     }
     .cat-chip:hover {
-      background: rgba(30, 33, 42, 0.9);
-      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(30, 34, 46, 0.9);
+      border-color: rgba(255, 255, 255, 0.25);
       color: #f3f4f6;
+      transform: translateY(-1px);
     }
     .cat-chip.active {
-      background: rgba(45, 50, 64, 0.95);
-      border-color: rgba(255, 255, 255, 0.3);
+      background: rgba(40, 46, 62, 0.95);
+      border-color: rgba(255, 255, 255, 0.35);
       color: #ffffff;
+      box-shadow: 0 0 10px rgba(255, 255, 255, 0.15);
     }
 
-    /* Bottom Toolbar */
+    /* Bottom Control Bar */
     .bottom-bar {
       position: absolute;
       bottom: 16px;
@@ -159,179 +324,196 @@ def build_viewer():
       gap: 8px;
       align-items: center;
       z-index: 10;
+      pointer-events: auto;
     }
     .ctrl-btn {
-      background: rgba(18, 19, 24, 0.85);
-      border: 1px solid rgba(255, 255, 255, 0.1);
-      padding: 6px 12px;
-      border-radius: 5px;
-      color: #cbd5e1;
-      font-size: 11px;
+      background: rgba(18, 20, 28, 0.85);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      color: #d1d5db;
+      padding: 6px 13px;
+      border-radius: 6px;
+      font-size: 11.5px;
       font-weight: 500;
       cursor: pointer;
+      backdrop-filter: blur(12px);
+      transition: all 0.15s ease;
       display: flex;
       align-items: center;
       gap: 6px;
-      backdrop-filter: blur(10px);
-      transition: all 0.15s;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
     }
     .ctrl-btn:hover {
-      background: rgba(32, 35, 45, 0.95);
-      border-color: rgba(255, 255, 255, 0.2);
+      background: rgba(30, 34, 46, 0.95);
+      border-color: rgba(255, 255, 255, 0.25);
       color: #fff;
     }
     .ctrl-btn.active {
-      background: rgba(45, 50, 65, 0.95);
-      border-color: rgba(255, 255, 255, 0.35);
-      color: #fff;
+      background: rgba(45, 52, 70, 0.95);
+      border-color: #3b82f6;
+      color: #60a5fa;
     }
 
     .stats-tag {
-      background: rgba(18, 19, 24, 0.85);
+      background: rgba(18, 20, 28, 0.80);
       border: 1px solid rgba(255, 255, 255, 0.08);
+      color: #838a98;
       padding: 6px 12px;
-      border-radius: 5px;
+      border-radius: 6px;
       font-size: 11px;
-      color: #6b7280;
-      font-weight: 500;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
       backdrop-filter: blur(10px);
     }
 
-    /* Floating Tooltip */
+    /* Tooltip */
     #node-tooltip {
       position: absolute;
-      display: none;
       pointer-events: none;
-      background: rgba(14, 15, 19, 0.95);
+      background: rgba(12, 14, 20, 0.95);
       border: 1px solid rgba(255, 255, 255, 0.15);
-      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.8);
-      padding: 8px 12px;
-      border-radius: 5px;
-      font-size: 12px;
-      color: #fff;
-      z-index: 25;
-      transform: translate(-50%, -130%);
-      white-space: nowrap;
-      backdrop-filter: blur(12px);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 11px;
+      color: #f3f4f6;
+      display: none;
+      z-index: 50;
+      backdrop-filter: blur(14px);
+      box-shadow: 0 6px 18px rgba(0, 0, 0, 0.6);
+      transform: translate(12px, -50%);
+      max-width: 260px;
     }
     #node-tooltip .tt-type {
-      font-size: 10px;
+      font-size: 9.5px;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      font-weight: 600;
-      color: #9ca3af;
+      font-weight: 700;
       margin-bottom: 2px;
     }
     #node-tooltip .tt-title {
-      font-weight: 600;
-      font-size: 12px;
-      color: #f3f4f6;
-    }
-
-    /* Detail Inspector Sidebar - Obsidian Minimalist Style */
-    .sidebar {
-      width: 420px;
-      height: 100%;
-      background: rgba(10, 11, 15, 0.96);
-      border-left: 1px solid rgba(255, 255, 255, 0.08);
-      padding: 22px;
-      overflow-y: auto;
-      display: flex;
-      flex-direction: column;
-      gap: 16px;
-      z-index: 20;
-      user-select: text;
-      backdrop-filter: blur(16px);
-    }
-    .sidebar::-webkit-scrollbar { width: 5px; }
-    .sidebar::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 3px; }
-
-    .sidebar-header {
-      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-      padding-bottom: 14px;
-    }
-    .node-type-badge {
-      display: inline-block;
-      padding: 3px 8px;
-      border-radius: 4px;
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      background: rgba(255, 255, 255, 0.08);
-      color: #d1d5db;
-      margin-bottom: 8px;
-    }
-    .sidebar-title {
-      font-size: 17px;
-      font-weight: 700;
-      color: #f9fafb;
+      font-weight: 500;
+      color: #e5e7eb;
       line-height: 1.35;
     }
+
+    /* Right Obsidian Inspector Sidebar */
+    .sidebar {
+      width: 440px;
+      height: 100%;
+      background: #090a0f;
+      border-left: 1px solid rgba(255, 255, 255, 0.08);
+      padding: 24px;
+      overflow-y: auto;
+      z-index: 20;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    }
+    .sidebar::-webkit-scrollbar { width: 5px; }
+    .sidebar::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.15);
+      border-radius: 3px;
+    }
+
+    .node-type-badge {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      margin-bottom: 8px;
+      width: fit-content;
+    }
+
+    .sidebar-title {
+      font-size: 17px;
+      font-weight: 600;
+      color: #f9fafb;
+      line-height: 1.35;
+      letter-spacing: -0.01em;
+    }
+
     .sidebar-desc {
-      font-size: 12px;
+      font-size: 12.5px;
       color: #9ca3af;
       line-height: 1.5;
       margin-top: 6px;
     }
 
-    .section-card {
-      background: rgba(18, 20, 26, 0.7);
-      border: 1px solid rgba(255, 255, 255, 0.06);
-      border-radius: 6px;
-      padding: 13px;
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-    }
-    .section-card h4 {
+    .breadcrumb-path {
       font-size: 11px;
-      text-transform: uppercase;
-      letter-spacing: 0.04em;
-      color: #d1d5db;
-      font-weight: 600;
+      color: #6b7280;
       display: flex;
       align-items: center;
       gap: 6px;
+      flex-wrap: wrap;
+      margin-bottom: 10px;
     }
-    .checklist-item {
-      font-size: 11.5px;
-      color: #9ca3af;
+    .breadcrumb-path span { color: #9ca3af; }
+
+    .section-card {
+      background: rgba(18, 20, 28, 0.6);
+      border: 1px solid rgba(255, 255, 255, 0.07);
+      border-radius: 8px;
+      padding: 14px;
       display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .section-card h4 {
+      font-size: 11.5px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: #9ca3af;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+
+    .checklist-item {
+      font-size: 12px;
+      color: #e5e7eb;
+      display: flex;
+      align-items: flex-start;
       gap: 8px;
       line-height: 1.45;
     }
     .checklist-item::before {
-      content: "•";
-      color: #d1d5db;
-      font-weight: bold;
+      content: "✓";
+      color: #10b981;
+      font-weight: 700;
+      font-size: 11px;
     }
+
     .script-item {
-      background: rgba(12, 13, 17, 0.85);
+      background: rgba(10, 12, 16, 0.8);
       border-left: 2px solid rgba(255, 255, 255, 0.3);
-      padding: 7px 11px;
+      padding: 8px 12px;
       border-radius: 0 4px 4px 0;
-      font-size: 11.5px;
+      font-size: 12px;
       color: #e5e7eb;
       line-height: 1.4;
     }
     .script-item strong {
-      color: #9ca3af;
-      font-size: 10.5px;
-      text-transform: uppercase;
-      margin-right: 4px;
+      color: #93c5fd;
+      font-size: 11px;
+      display: block;
+      margin-bottom: 3px;
     }
+
     .notes-box {
       background: #050608;
       border: 1px solid rgba(255, 255, 255, 0.08);
       border-radius: 5px;
-      padding: 10px;
+      padding: 12px;
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-      font-size: 10.5px;
+      font-size: 11px;
       color: #d1d5db;
       white-space: pre-wrap;
       line-height: 1.5;
-      max-height: 160px;
+      max-height: 180px;
       overflow-y: auto;
     }
     .copy-btn {
@@ -349,27 +531,30 @@ def build_viewer():
       background: rgba(255, 255, 255, 0.15);
       color: #fff;
     }
-    .hint-box {
-      font-size: 11.5px;
-      color: #6b7280;
-      text-align: center;
-      padding: 24px 12px;
-      line-height: 1.5;
-    }
+
     .sub-item-link {
-      padding: 7px 10px;
-      border-radius: 5px;
-      background: rgba(12, 13, 17, 0.6);
-      border: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 8px 11px;
+      border-radius: 6px;
+      background: rgba(14, 16, 22, 0.7);
+      border: 1px solid rgba(255, 255, 255, 0.06);
       font-size: 11.5px;
       color: #d1d5db;
       cursor: pointer;
       transition: all 0.15s;
     }
     .sub-item-link:hover {
-      background: rgba(25, 28, 36, 0.85);
-      border-color: rgba(255, 255, 255, 0.15);
+      background: rgba(28, 32, 44, 0.9);
+      border-color: rgba(255, 255, 255, 0.2);
       color: #fff;
+      transform: translateX(2px);
+    }
+
+    .hint-box {
+      font-size: 12px;
+      color: #6b7280;
+      text-align: center;
+      padding: 36px 16px;
+      line-height: 1.6;
     }
   </style>
 </head>
@@ -386,7 +571,7 @@ def build_viewer():
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
         </svg>
-        <input type="text" class="search-input" id="search-box" placeholder="Search node, code, scenario..." autocomplete="off" />
+        <input type="text" class="search-input" id="search-box" placeholder="Search CARC, scenario, checklist, CPT..." autocomplete="off" />
       </div>
 
       <div class="category-pills" id="category-pills"></div>
@@ -395,9 +580,11 @@ def build_viewer():
     <canvas id="graph-canvas"></canvas>
 
     <div class="bottom-bar">
-      <button class="ctrl-btn" id="btn-reset" title="Reset Camera">↺ Reset View</button>
+      <button class="ctrl-btn active" id="btn-mode" title="Toggle 3D Sphere / 2D Constellation">🌐 3D Sphere</button>
+      <button class="ctrl-btn active" id="btn-rotate" title="Toggle Celestial Orbit">✨ Orbit</button>
       <button class="ctrl-btn active" id="btn-labels" title="Toggle Labels">🏷️ Labels</button>
-      <div class="stats-tag" id="stats-counter">205 nodes · 197 links</div>
+      <button class="ctrl-btn" id="btn-reset" title="Reset View">↺ Reset</button>
+      <div class="stats-tag" id="stats-counter">354 nodes · 354 connections · 8 categories</div>
     </div>
 
     <div id="node-tooltip">
@@ -407,15 +594,21 @@ def build_viewer():
   </div>
 
   <div class="sidebar" id="sidebar">
-    <div class="sidebar-header">
-      <span class="node-type-badge" id="badge-type">Category</span>
-      <h2 class="sidebar-title" id="node-title">Missing Information & Documentation</h2>
-      <p class="sidebar-desc" id="node-desc">Claims failing due to absent operative reports, medical records, or unsigned certifications.</p>
-    </div>
+    <div id="sidebar-content">
+      <div class="sidebar-header">
+        <span class="node-type-badge" id="badge-type" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd;">CATEGORY</span>
+        <h2 class="sidebar-title" id="node-title">Healthcare Denial Knowledge Graph</h2>
+        <p class="sidebar-desc" id="node-desc">Multi-hop ontological mesh connecting CARC/RARC denial codes, operational scenarios, investigation checklists, CMS-1500 box mappings, and resolution playbooks.</p>
+      </div>
 
-    <div id="dynamic-sections" style="display: flex; flex-direction: column; gap: 14px;">
-      <div class="hint-box">
-        Click on any node in the Obsidian constellation to inspect its investigation checklist, CMS-1500 field mapping, and payer script.
+      <div id="dynamic-sections" style="display: flex; flex-direction: column; gap: 14px; margin-top: 16px;">
+        <div class="hint-box">
+          <svg style="width: 32px; height: 32px; stroke: #4b5563; fill: none; margin-bottom: 12px;" viewBox="0 0 24 24" stroke-width="1.5">
+            <circle cx="12" cy="12" r="9"></circle>
+            <path d="M12 3v18M3 12h18"></path>
+          </svg><br/>
+          Click any node in the spherical galaxy to inspect its root-cause investigation checklist, CMS-1500 form fields, payer call script, and resolution actions.
+        </div>
       </div>
     </div>
   </div>
@@ -430,44 +623,33 @@ def build_viewer():
 
     function resizeCanvas() {
       const container = document.getElementById('canvas-container');
-      const w = container ? container.clientWidth : 0;
-      const h = container ? container.clientHeight : 0;
-      width = canvas.width = Math.max(w || (window.innerWidth - 420), 500);
-      height = canvas.height = Math.max(h || window.innerHeight, 500);
+      width = canvas.width = container ? container.clientWidth : window.innerWidth - 440;
+      height = canvas.height = container ? container.clientHeight : window.innerHeight;
     }
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // Obsidian Muted Tag Accents for Hubs (leaves stay graphite silver)
-    const CLUSTER_PALETTES = {
+    // Official Jewel Palettes for the 8 Core Categories
+    const CATEGORY_PALETTES = {
       'CAT_MISSING_INFO':       { accent: '#3b82f6', name: 'Missing Info' },
-      'CAT_PRIOR_AUTH':          { accent: '#10b981', name: 'Prior Auth' },
-      'CAT_TIMELY_FILING':       { accent: '#f43f5e', name: 'Timely Filing' },
+      'CAT_PRIOR_AUTH':          { accent: '#8b5cf6', name: 'Prior Auth' },
+      'CAT_TIMELY_FILING':       { accent: '#ef4444', name: 'Timely Filing' },
       'CAT_COB':                 { accent: '#f59e0b', name: 'COB' },
-      'CAT_MEDICAL_NECESSITY':   { accent: '#8b5cf6', name: 'Med Necessity' },
-      'CAT_CODING_MODIFIERS':    { accent: '#0ea5e9', name: 'Coding & Mod' },
+      'CAT_MEDICAL_NECESSITY':   { accent: '#10b981', name: 'Med Necessity' },
+      'CAT_CODING_MODIFIERS':    { accent: '#06b6d4', name: 'Coding & Mod' },
+      'CAT_DUPLICATE_BUNDLING':  { accent: '#ec4899', name: 'Duplicate & NCCI' },
       'CAT_ELIGIBILITY':         { accent: '#6366f1', name: 'Eligibility' }
     };
 
-    const CLUSTER_CENTERS = {
-      'CAT_MISSING_INFO':       { angle: 0,                   dist: 175 },
-      'CAT_PRIOR_AUTH':          { angle: Math.PI * 0.25,      dist: 175 },
-      'CAT_TIMELY_FILING':       { angle: Math.PI * 0.5,       dist: 175 },
-      'CAT_COB':                 { angle: Math.PI * 0.75,      dist: 175 },
-      'CAT_MEDICAL_NECESSITY':   { angle: Math.PI,             dist: 175 },
-      'CAT_CODING_MODIFIERS':    { angle: Math.PI * 1.25,      dist: 175 },
-      'CAT_DUPLICATE_BUNDLING':  { angle: Math.PI * 1.5,       dist: 175 },
-      'CAT_ELIGIBILITY':         { angle: Math.PI * 1.75,      dist: 175 }
-    };
-
-    // Category Filter Chips
+    // Render Category Filter Chips
     const catContainer = document.getElementById('category-pills');
     if (graphData.categories) {
       graphData.categories.forEach(function(cat) {
-        const pal = CLUSTER_PALETTES[cat.id] || { accent: '#9ca3af' };
+        const pal = CATEGORY_PALETTES[cat.id] || { accent: cat.color || '#9ca3af', name: cat.name.split(' ')[0] };
         const chip = document.createElement('div');
         chip.className = 'cat-chip';
-        chip.innerHTML = '<span class="dot" style="background:' + pal.accent + '"></span>' + (pal.name || cat.name.split(' ')[0]);
+        chip.id = 'chip-' + cat.id;
+        chip.innerHTML = '<span class="dot" style="background:' + pal.accent + '"></span>' + (pal.name || cat.name);
         chip.title = cat.name;
         chip.addEventListener('click', function() {
           selectCategory(cat.id);
@@ -476,20 +658,45 @@ def build_viewer():
       });
     }
 
-    function getNodeCategoryId(node) {
-      if (node.type === 'category') return node.id;
-      if (node.properties && node.properties.category_id) return node.properties.category_id;
-      return null;
-    }
-
-    // Initialize Nodes with Obsidian Design Hierarchy
+    // Node & Link Processing
     const nodes = graphData.nodes.map(function(n) {
-      let catId = getNodeCategoryId(n);
+      const pal = CATEGORY_PALETTES[n.cat_id] || { accent: '#9ca3af' };
+      let r = 2.8;
+      let col = '#848e9c';
+
+      if (n.type === 'category') {
+        r = 11.0;
+        col = pal.accent;
+      } else if (n.type === 'denial_code') {
+        r = 6.8;
+        col = pal.accent;
+      } else if (n.type === 'scenario') {
+        r = 4.4;
+        col = '#9ca6b5';
+      } else if (n.type === 'investigation_step') {
+        r = 2.8;
+        col = '#738094';
+      } else if (n.type === 'payer_question') {
+        r = 2.8;
+        col = '#738094';
+      } else if (n.type === 'form_requirement') {
+        r = 3.2;
+        col = '#93c5fd';
+      } else if (n.type === 'action_plan') {
+        r = 3.2;
+        col = '#6ee7b7';
+      }
+
       return Object.assign({}, n, {
-        categoryId: catId,
-        x: 0, y: 0, vx: 0, vy: 0,
-        radius: (n.type === 'category' ? 10.5 : (n.type === 'denial_code' ? 6.5 : (n.type === 'scenario' ? 4.2 : 2.6))),
-        color: '#848a98'
+        color: col,
+        radius: r,
+        categoryColor: pal.accent,
+        // Projected runtime values
+        projX: 0,
+        projY: 0,
+        projZ: 0,
+        projScale: 1.0,
+        alpha: 1.0
       });
     });
 
@@ -503,175 +710,120 @@ def build_viewer():
       });
     }).filter(function(l) { return l.sourceNode && l.targetNode; });
 
-    // Propagate category ID to child nodes
-    for (let p = 0; p < 3; p++) {
-      links.forEach(function(l) {
-        if (l.sourceNode.categoryId && !l.targetNode.categoryId) {
-          l.targetNode.categoryId = l.sourceNode.categoryId;
-        }
-        if (l.targetNode.categoryId && !l.sourceNode.categoryId) {
-          l.sourceNode.categoryId = l.targetNode.categoryId;
-        }
-      });
-    }
+    // Update bottom stats counter dynamically
+    document.getElementById('stats-counter').textContent =
+      nodes.length + ' nodes · ' + links.length + ' connections · ' + graphData.categories.length + ' categories';
 
-    // Obsidian Palette Assignment:
-    // Category hubs and CARC code hubs have color accents; leaves are graphite silver stars
-    nodes.forEach(function(n, i) {
-      const pal = CLUSTER_PALETTES[n.categoryId] || { accent: '#9ca3af' };
-      if (n.type === 'category') {
-        n.color = pal.accent;
-        n.radius = 10.5;
-      } else if (n.type === 'denial_code') {
-        n.color = pal.accent;
-        n.radius = 6.4;
-      } else if (n.type === 'scenario') {
-        n.color = '#9aa2b1';
-        n.radius = 4.2;
-      } else {
-        // Child checkpoints, form boxes, scripts, actions: pure Obsidian graphite-silver stars
-        n.color = '#798394';
-        n.radius = 2.6;
-      }
+    // Camera & Interaction State
+    let is3DMode = true;
+    let autoRotate = true;
+    let showLabels = true;
 
-      // Initial orbital position
-      const cluster = CLUSTER_CENTERS[n.categoryId] || { angle: (i / nodes.length) * Math.PI * 2, dist: 160 };
-      const cx = Math.cos(cluster.angle) * cluster.dist;
-      const cy = Math.sin(cluster.angle) * cluster.dist;
+    // 3D Angles
+    let rotX = -0.32;
+    let rotY = 0.55;
+    let targetRotX = null;
+    let targetRotY = null;
+    let zoom3D = 1.0;
+    let pan3D = { x: 0, y: 0 };
 
-      if (n.type === 'category') {
-        n.x = cx;
-        n.y = cy;
-      } else if (n.type === 'denial_code') {
-        const offsetAngle = Math.random() * Math.PI * 2;
-        const offsetDist = 30 + Math.random() * 45;
-        n.x = cx + Math.cos(offsetAngle) * offsetDist;
-        n.y = cy + Math.sin(offsetAngle) * offsetDist;
-      } else if (n.type === 'scenario') {
-        const offsetAngle = Math.random() * Math.PI * 2;
-        const offsetDist = 50 + Math.random() * 60;
-        n.x = cx + Math.cos(offsetAngle) * offsetDist;
-        n.y = cy + Math.sin(offsetAngle) * offsetDist;
-      } else {
-        const offsetAngle = Math.random() * Math.PI * 2;
-        const offsetDist = 65 + Math.random() * 75;
-        n.x = cx + Math.cos(offsetAngle) * offsetDist;
-        n.y = cy + Math.sin(offsetAngle) * offsetDist;
-      }
-    });
+    // 2D Pan/Zoom
+    let transform2D = { x: 0, y: 0, scale: 1.0 };
+    let targetTransform2D = null;
 
-    // Organic Force Relaxation for Constellation Density
-    for (let step = 0; step < 130; step++) {
-      // Repulsion
-      for (let i = 0; i < nodes.length; i++) {
-        for (let j = i + 1; j < nodes.length; j++) {
-          const a = nodes[i];
-          const b = nodes[j];
-          let dx = b.x - a.x;
-          let dy = b.y - a.y;
-          let dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const minDist = (a.radius + b.radius) * 2.7;
-          if (dist < minDist) {
-            const force = (minDist - dist) / dist * 0.30;
-            const fx = dx * force;
-            const fy = dy * force;
-            if (a.type !== 'category') { a.vx -= fx; a.vy -= fy; }
-            if (b.type !== 'category') { b.vx += fx; b.vy += fy; }
-          }
-        }
-      }
-
-      // Link spring attraction
-      links.forEach(function(l) {
-        const a = l.sourceNode;
-        const b = l.targetNode;
-        const dx = b.x - a.x;
-        const dy = b.y - a.y;
-        const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-        let targetDist = 20 + (a.radius + b.radius);
-        if (a.type === 'category' || b.type === 'category') targetDist = 44;
-        else if (a.type === 'denial_code' || b.type === 'denial_code') targetDist = 28;
-        const force = (dist - targetDist) * 0.048;
-        const fx = (dx / dist) * force;
-        const fy = (dy / dist) * force;
-        if (a.type !== 'category') { a.vx -= fx; a.vy -= fy; }
-        if (b.type !== 'category') { b.vx += fx; b.vy += fy; }
-      });
-
-      // Gravity toward cluster anchor and central cosmic cohesion
-      nodes.forEach(function(n) {
-        if (n.type === 'category') return;
-        const cluster = CLUSTER_CENTERS[n.categoryId];
-        if (cluster) {
-          const cx = Math.cos(cluster.angle) * cluster.dist;
-          const cy = Math.sin(cluster.angle) * cluster.dist;
-          n.vx += (cx - n.x) * 0.011;
-          n.vy += (cy - n.y) * 0.011;
-        }
-        // Subtle global pull to prevent stray drift
-        n.vx -= n.x * 0.0016;
-        n.vy -= n.y * 0.0016;
-
-        n.x += n.vx;
-        n.y += n.vy;
-        n.vx *= 0.70;
-      });
-    }
-
-    // Camera State
-    let transform = { x: 0, y: 0, scale: 1.0 };
     let isDragging = false;
+    let isPanning = false;
+    let startMouse = { x: 0, y: 0 };
     let draggedNode = null;
-    let startPan = { x: 0, y: 0 };
     let hoveredNode = null;
     let selectedNode = null;
     let filterQuery = '';
-    let showLabels = true;
-    let targetTransform = null;
 
+    // Celestial Ambient Background Stars (Pre-generated for deep cosmic ambiance)
+    const AMBIENT_STARS = [];
+    for (let s = 0; s < 120; s++) {
+      AMBIENT_STARS.push({
+        x: (Math.random() - 0.5) * 2000,
+        y: (Math.random() - 0.5) * 1400,
+        r: Math.random() * 1.2 + 0.3,
+        alpha: Math.random() * 0.45 + 0.15
+      });
+    }
+
+    // Mouse Listeners
     canvas.addEventListener('mousedown', function(e) {
       const rect = canvas.getBoundingClientRect();
-      const mouseX = (e.clientX - rect.left - width / 2 - transform.x) / transform.scale;
-      const mouseY = (e.clientY - rect.top - height / 2 - transform.y) / transform.scale;
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
+      // Hit-test on nodes
+      let clicked = null;
       for (let i = nodes.length - 1; i >= 0; i--) {
         const n = nodes[i];
-        const dx = mouseX - n.x;
-        const dy = mouseY - n.y;
-        const hitR = Math.max(n.radius * 1.8, 10);
+        const screenX = is3DMode ? n.projX : (width / 2 + transform2D.x + n.x2 * transform2D.scale);
+        const screenY = is3DMode ? n.projY : (height / 2 + transform2D.y + n.y2 * transform2D.scale);
+        const hitR = Math.max(n.radius * (is3DMode ? n.projScale : transform2D.scale) * 1.8, 9);
+        const dx = mouseX - screenX;
+        const dy = mouseY - screenY;
         if (dx * dx + dy * dy < hitR * hitR) {
-          draggedNode = n;
-          selectNode(n);
-          targetTransform = null;
-          return;
+          clicked = n;
+          break;
         }
       }
 
-      isDragging = true;
-      startPan = { x: e.clientX - transform.x, y: e.clientY - transform.y };
-      targetTransform = null;
+      if (clicked) {
+        selectNode(clicked);
+        return;
+      }
+
+      if (e.button === 2 || e.shiftKey) {
+        isPanning = true;
+      } else {
+        isDragging = true;
+      }
+      startMouse = { x: e.clientX, y: e.clientY };
+      targetRotX = null;
+      targetRotY = null;
+      targetTransform2D = null;
     });
 
     window.addEventListener('mousemove', function(e) {
       const rect = canvas.getBoundingClientRect();
-      const mouseX = (e.clientX - rect.left - width / 2 - transform.x) / transform.scale;
-      const mouseY = (e.clientY - rect.top - height / 2 - transform.y) / transform.scale;
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
 
-      if (draggedNode) {
-        draggedNode.x = mouseX;
-        draggedNode.y = mouseY;
-        draggedNode.vx = 0;
-        draggedNode.vy = 0;
-      } else if (isDragging) {
-        transform.x = e.clientX - startPan.x;
-        transform.y = e.clientY - startPan.y;
+      if (isDragging) {
+        const dx = e.clientX - startMouse.x;
+        const dy = e.clientY - startMouse.y;
+        if (is3DMode) {
+          rotY += dx * 0.0055;
+          rotX = Math.max(-1.4, Math.min(1.4, rotX + dy * 0.0055));
+        } else {
+          transform2D.x += dx;
+          transform2D.y += dy;
+        }
+        startMouse = { x: e.clientX, y: e.clientY };
+      } else if (isPanning) {
+        const dx = e.clientX - startMouse.x;
+        const dy = e.clientY - startMouse.y;
+        if (is3DMode) {
+          pan3D.x += dx;
+          pan3D.y += dy;
+        } else {
+          transform2D.x += dx;
+          transform2D.y += dy;
+        }
+        startMouse = { x: e.clientX, y: e.clientY };
       } else {
+        // Hover detection
         let found = null;
         for (let i = nodes.length - 1; i >= 0; i--) {
           const n = nodes[i];
-          const dx = mouseX - n.x;
-          const dy = mouseY - n.y;
-          const hitR = Math.max(n.radius * 1.6, 9);
+          const screenX = is3DMode ? n.projX : (width / 2 + transform2D.x + n.x2 * transform2D.scale);
+          const screenY = is3DMode ? n.projY : (height / 2 + transform2D.y + n.y2 * transform2D.scale);
+          const hitR = Math.max(n.radius * (is3DMode ? n.projScale : transform2D.scale) * 1.8, 9);
+          const dx = mouseX - screenX;
+          const dy = mouseY - screenY;
           if (dx * dx + dy * dy < hitR * hitR) {
             found = n;
             break;
@@ -679,22 +831,31 @@ def build_viewer():
         }
         if (found !== hoveredNode) {
           hoveredNode = found;
-          updateTooltip(hoveredNode, e.clientX - rect.left, e.clientY - rect.top);
+          updateTooltip(hoveredNode, mouseX, mouseY);
+        } else if (hoveredNode) {
+          updateTooltip(hoveredNode, mouseX, mouseY);
         }
       }
     });
 
     window.addEventListener('mouseup', function() {
-      draggedNode = null;
       isDragging = false;
+      isPanning = false;
     });
 
     canvas.addEventListener('wheel', function(e) {
       e.preventDefault();
       const zoomFactor = e.deltaY < 0 ? 1.08 : 0.92;
-      transform.scale = Math.max(0.35, Math.min(3.5, transform.scale * zoomFactor));
+      if (is3DMode) {
+        zoom3D = Math.max(0.45, Math.min(2.8, zoom3D * zoomFactor));
+      } else {
+        transform2D.scale = Math.max(0.35, Math.min(3.2, transform2D.scale * zoomFactor));
+      }
     });
 
+    canvas.addEventListener('contextmenu', function(e) { e.preventDefault(); });
+
+    // Tooltip Helper
     const tooltipEl = document.getElementById('node-tooltip');
     const ttType = document.getElementById('tt-type');
     const ttTitle = document.getElementById('tt-title');
@@ -704,33 +865,88 @@ def build_viewer():
         tooltipEl.style.display = 'none';
         return;
       }
-      ttType.textContent = node.type.replace('_', ' ');
-      ttType.style.color = node.color;
+      ttType.textContent = node.type.replace(/_/g, ' ');
+      ttType.style.color = node.categoryColor || '#93c5fd';
       ttTitle.textContent = node.label;
       tooltipEl.style.left = x + 'px';
       tooltipEl.style.top = y + 'px';
       tooltipEl.style.display = 'block';
     }
 
-    // Obsidian Render Loop
-    function draw() {
-      if (targetTransform) {
-        transform.x += (targetTransform.x - transform.x) * 0.12;
-        transform.y += (targetTransform.y - transform.y) * 0.12;
-        transform.scale += (targetTransform.scale - transform.scale) * 0.12;
-        if (Math.abs(targetTransform.x - transform.x) < 0.4 &&
-            Math.abs(targetTransform.y - transform.y) < 0.4 &&
-            Math.abs(targetTransform.scale - transform.scale) < 0.005) {
-          targetTransform = null;
+    // Main Obsidian Spherical Render Loop
+    function render() {
+      ctx.clearRect(0, 0, width, height);
+
+      // Ambient Space Dust / Constellation Starfield
+      ctx.fillStyle = '#ffffff';
+      AMBIENT_STARS.forEach(function(star) {
+        ctx.globalAlpha = star.alpha;
+        ctx.beginPath();
+        ctx.arc(width / 2 + star.x, height / 2 + star.y, star.r, 0, Math.PI * 2);
+        ctx.fill();
+      });
+      ctx.globalAlpha = 1.0;
+
+      // Auto-rotation in 3D mode
+      if (is3DMode && autoRotate && !isDragging && !isPanning && !hoveredNode && !targetRotX) {
+        rotY += 0.0018;
+      }
+
+      // Smooth camera interpolation
+      if (targetRotX !== null && targetRotY !== null) {
+        rotX += (targetRotX - rotX) * 0.10;
+        rotY += (targetRotY - rotY) * 0.10;
+        if (Math.abs(targetRotX - rotX) < 0.005 && Math.abs(targetRotY - rotY) < 0.005) {
+          targetRotX = null;
+          targetRotY = null;
         }
       }
 
-      ctx.clearRect(0, 0, width, height);
+      if (targetTransform2D !== null) {
+        transform2D.x += (targetTransform2D.x - transform2D.x) * 0.12;
+        transform2D.y += (targetTransform2D.y - transform2D.y) * 0.12;
+        transform2D.scale += (targetTransform2D.scale - transform2D.scale) * 0.12;
+        if (Math.abs(targetTransform2D.x - transform2D.x) < 0.5 &&
+            Math.abs(targetTransform2D.y - transform2D.y) < 0.5) {
+          targetTransform2D = null;
+        }
+      }
 
-      ctx.save();
-      ctx.translate(width / 2 + transform.x, height / 2 + transform.y);
-      ctx.scale(transform.scale, transform.scale);
+      // 1. Calculate Node Coordinates (3D Perspective Projection or 2D)
+      const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+      const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+      const cameraDist = 880;
+      const fov = 720;
+      const centerX = width / 2 + (is3DMode ? pan3D.x : transform2D.x);
+      const centerY = height / 2 + (is3DMode ? pan3D.y : transform2D.y);
 
+      nodes.forEach(function(n) {
+        if (is3DMode) {
+          // 3D rotation
+          const x1 = n.x3 * cosY + n.z3 * sinY;
+          const z1 = -n.x3 * sinY + n.z3 * cosY;
+          const y2 = n.y3 * cosX - z1 * sinX;
+          const z2 = n.y3 * sinX + z1 * cosX;
+
+          const factor = fov / (cameraDist - z2 * zoom3D);
+          n.projX = centerX + x1 * zoom3D * factor;
+          n.projY = centerY + y2 * zoom3D * factor;
+          n.projZ = z2;
+          n.projScale = factor;
+
+          // Depth attenuation
+          const depthNorm = (z2 + 380) / 760; // 0 (far) to 1 (near)
+          n.alpha = Math.max(0.18, Math.min(1.0, 0.25 + depthNorm * 0.75));
+        } else {
+          n.projX = centerX + n.x2 * transform2D.scale;
+          n.projY = centerY + n.y2 * transform2D.scale;
+          n.projZ = 0;
+          n.projScale = transform2D.scale;
+          n.alpha = 1.0;
+        }
+      });
+
+      // Active Connection Tracing
       const activeFocus = selectedNode || hoveredNode;
       const activeNeighbors = new Set();
       if (activeFocus) {
@@ -740,7 +956,8 @@ def build_viewer():
         });
       }
 
-      // 1. Draw Links (Obsidian High-Contrast Graphite Filaments)
+      // 2. Draw Links (Obsidian Celestial Filaments with Depth)
+      // Draw background/unfocused links first, then highlighted active connection pathways on top
       links.forEach(function(l) {
         const a = l.sourceNode;
         const b = l.targetNode;
@@ -749,42 +966,66 @@ def build_viewer():
         const isNeighbor = activeFocus && !isDirect && activeNeighbors.has(a) && activeNeighbors.has(b);
         const isDimmed = activeFocus && !isDirect && !isNeighbor;
 
-        ctx.beginPath();
-        ctx.moveTo(a.x, a.y);
-        ctx.lineTo(b.x, b.y);
+        // Skip direct connections for top layer rendering
+        if (isDirect) return;
 
-        if (isDirect) {
-          ctx.strokeStyle = '#ffffff';
-          ctx.lineWidth = 2.4;
-          ctx.globalAlpha = 1.0;
-        } else if (isNeighbor) {
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.70)';
-          ctx.lineWidth = 1.5;
-          ctx.globalAlpha = 0.88;
-        } else if (isDimmed) {
-          ctx.strokeStyle = 'rgba(180, 195, 220, 0.12)';
-          ctx.lineWidth = 0.65;
-          ctx.globalAlpha = 0.30;
+        ctx.beginPath();
+        ctx.moveTo(a.projX, a.projY);
+        ctx.lineTo(b.projX, b.projY);
+
+        if (isDimmed) {
+          ctx.strokeStyle = 'rgba(150, 175, 210, 0.08)';
+          ctx.lineWidth = 0.5;
+          ctx.globalAlpha = 0.20;
         } else {
-          // PROMINENT, CRISP OBSIDIAN LINKS (Properly visible like reference)
+          const depthAlpha = is3DMode ? ((a.alpha + b.alpha) / 2) : 1.0;
           if (a.type === 'category' || b.type === 'category') {
-            ctx.strokeStyle = 'rgba(225, 235, 255, 0.65)'; // Category spine
-            ctx.lineWidth = 1.5;
+            ctx.strokeStyle = 'rgba(215, 230, 255, ' + (0.55 * depthAlpha) + ')';
+            ctx.lineWidth = 1.6;
           } else if (a.type === 'denial_code' || b.type === 'denial_code') {
-            ctx.strokeStyle = 'rgba(200, 215, 240, 0.52)'; // Major code branches
-            ctx.lineWidth = 1.25;
+            ctx.strokeStyle = 'rgba(190, 212, 245, ' + (0.42 * depthAlpha) + ')';
+            ctx.lineWidth = 1.2;
+          } else if (l.relation === 'RELATED_TO') {
+            ctx.strokeStyle = 'rgba(245, 158, 11, ' + (0.60 * depthAlpha) + ')';
+            ctx.lineWidth = 1.3;
           } else {
-            ctx.strokeStyle = 'rgba(175, 192, 220, 0.40)'; // Fine constellation filaments
-            ctx.lineWidth = 1.0;
+            ctx.strokeStyle = 'rgba(165, 188, 220, ' + (0.30 * depthAlpha) + ')';
+            ctx.lineWidth = 0.9;
           }
           ctx.globalAlpha = 1.0;
         }
         ctx.stroke();
       });
+
+      // Highlighted Active Direct Connections (Rendered Crisp & Bright on Top)
+      if (activeFocus) {
+        links.forEach(function(l) {
+          const a = l.sourceNode;
+          const b = l.targetNode;
+          const isDirect = (a === activeFocus || b === activeFocus);
+          if (!isDirect) return;
+
+          ctx.beginPath();
+          ctx.moveTo(a.projX, a.projY);
+          ctx.lineTo(b.projX, b.projY);
+
+          // Luminous White Connection Filament
+          ctx.strokeStyle = '#ffffff';
+          ctx.lineWidth = 2.6;
+          ctx.globalAlpha = 1.0;
+          ctx.shadowColor = '#ffffff';
+          ctx.shadowBlur = 8;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+        });
+      }
       ctx.globalAlpha = 1.0;
 
-      // 2. Draw Nodes (Obsidian Constellation Stars & Jewel Hubs)
-      nodes.forEach(function(n) {
+      // 3. Draw Nodes (Constellation Stars & Category Jewel Hubs)
+      // In 3D mode, sort back-to-front for realistic depth rendering
+      const sortedNodes = is3DMode ? nodes.slice().sort(function(a, b) { return a.projZ - b.projZ; }) : nodes;
+
+      sortedNodes.forEach(function(n) {
         const isSelected = n === selectedNode;
         const isHovered = n === hoveredNode;
         const isDirect = activeFocus && (n === activeFocus);
@@ -796,88 +1037,109 @@ def build_viewer():
           (n.description && n.description.toLowerCase().indexOf(filterQuery) !== -1)
         );
 
-        const r = n.radius * (isSelected ? 1.4 : (isHovered ? 1.25 : 1.0));
+        const r = Math.max(1.8, n.radius * (is3DMode ? n.projScale : transform2D.scale) * (isSelected ? 1.4 : (isHovered ? 1.25 : 1.0)));
 
-        // Soft outer focus halo for hubs & active nodes
+        // Outer Glow Halo for Hubs & Active Focus
         if (isSelected || isHovered) {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, r + 5, 0, Math.PI * 2);
-          ctx.fillStyle = n.color;
-          ctx.globalAlpha = 0.32;
+          ctx.arc(n.projX, n.projY, r + 6, 0, Math.PI * 2);
+          ctx.fillStyle = n.categoryColor || '#ffffff';
+          ctx.globalAlpha = 0.38;
           ctx.fill();
-          ctx.globalAlpha = 1.0;
         } else if (n.type === 'category' || n.type === 'denial_code') {
           ctx.beginPath();
-          ctx.arc(n.x, n.y, r + 2.5, 0, Math.PI * 2);
-          ctx.fillStyle = n.color;
-          ctx.globalAlpha = isDimmed ? 0.05 : 0.18;
+          ctx.arc(n.projX, n.projY, r + 3, 0, Math.PI * 2);
+          ctx.fillStyle = n.categoryColor;
+          ctx.globalAlpha = isDimmed ? 0.05 : (0.22 * n.alpha);
           ctx.fill();
-          ctx.globalAlpha = 1.0;
         }
 
-        // Node Body
+        // Search Match Highlight Ring
+        if (isMatch) {
+          ctx.beginPath();
+          ctx.arc(n.projX, n.projY, r + 4.5, 0, Math.PI * 2);
+          ctx.strokeStyle = '#fbbf24';
+          ctx.lineWidth = 2.0;
+          ctx.globalAlpha = 1.0;
+          ctx.stroke();
+        }
+
+        // Node Solid Core
         ctx.beginPath();
-        ctx.arc(n.x, n.y, Math.max(1.8, r), 0, Math.PI * 2);
+        ctx.arc(n.projX, n.projY, r, 0, Math.PI * 2);
         ctx.fillStyle = isSelected ? '#ffffff' : (isHovered ? '#ffffff' : n.color);
-        ctx.globalAlpha = isDimmed ? 0.20 : 1.0;
+        ctx.globalAlpha = isDimmed ? 0.15 : (is3DMode ? n.alpha : 1.0);
         ctx.fill();
 
-        // Node Edge Outline
-        ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? n.color : 'rgba(0, 0, 0, 0.5)');
-        ctx.lineWidth = isSelected ? 2.0 : (isHovered ? 1.6 : 0.5);
+        // Node Outline
+        ctx.strokeStyle = isSelected ? '#ffffff' : (isHovered ? n.categoryColor : 'rgba(0, 0, 0, 0.6)');
+        ctx.lineWidth = isSelected ? 2.0 : (isHovered ? 1.6 : 0.6);
         ctx.stroke();
         ctx.globalAlpha = 1.0;
 
         // Clean Obsidian Typography
+        const curScale = is3DMode ? (n.projScale * zoom3D) : transform2D.scale;
         const shouldShowLabel = showLabels && (
           isSelected || isHovered || isMatch || isConnected ||
           n.type === 'category' ||
-          (n.type === 'denial_code' && transform.scale > 0.65) ||
-          (n.type === 'scenario' && transform.scale > 1.3)
+          (n.type === 'denial_code' && curScale > 0.75) ||
+          (n.type === 'scenario' && curScale > 1.25)
         );
 
         if (shouldShowLabel && !isDimmed) {
           const fontSize = n.type === 'category' ? 11.5 : (n.type === 'denial_code' ? 10.5 : 9.5);
           ctx.font = (n.type === 'category' || isSelected ? '600 ' : '400 ') + fontSize + 'px -apple-system, Inter, sans-serif';
 
-          const maxChars = n.type === 'category' ? 26 : (n.type === 'denial_code' ? 18 : 14);
+          const maxChars = n.type === 'category' ? 26 : (n.type === 'denial_code' ? 20 : 16);
           const displayLabel = n.label.length > maxChars ? n.label.slice(0, maxChars - 2) + '...' : n.label;
 
           ctx.shadowColor = '#000000';
-          ctx.shadowBlur = 5;
-          ctx.fillStyle = isSelected ? '#ffffff' : (n.type === 'category' ? '#f3f4f6' : '#9ca3af');
+          ctx.shadowBlur = 6;
+          ctx.fillStyle = isSelected ? '#ffffff' : (n.type === 'category' ? '#f9fafb' : '#9ca3af');
           ctx.textAlign = 'center';
           ctx.textBaseline = 'top';
-          ctx.fillText(displayLabel, n.x, n.y + r + 3);
+          ctx.fillText(displayLabel, n.projX, n.projY + r + 3);
           ctx.shadowBlur = 0;
         }
       });
 
-      ctx.restore();
-      requestAnimationFrame(draw);
+      requestAnimationFrame(render);
     }
 
-    draw();
+    render();
 
+    // Node Selection & Inspection
     function selectNode(node) {
       selectedNode = node;
       displayNodeDetails(node);
 
-      targetTransform = {
-        x: -node.x * transform.scale,
-        y: -node.y * transform.scale,
-        scale: Math.max(transform.scale, 1.05)
-      };
+      if (is3DMode) {
+        // Rotate sphere to face selected node directly toward camera
+        const r = Math.sqrt(node.x3 * node.x3 + node.y3 * node.y3 + node.z3 * node.z3) || 1;
+        targetRotY = -Math.atan2(node.x3, node.z3);
+        targetRotX = Math.asin(node.y3 / r);
+        zoom3D = Math.max(zoom3D, 1.15);
+      } else {
+        targetTransform2D = {
+          x: -node.x2 * transform2D.scale,
+          y: -node.y2 * transform2D.scale,
+          scale: Math.max(transform2D.scale, 1.15)
+        };
+      }
     }
 
     function selectCategory(catId) {
+      document.querySelectorAll('.cat-chip').forEach(function(c) { c.classList.remove('active'); });
+      const chip = document.getElementById('chip-' + catId);
+      if (chip) chip.classList.add('active');
+
       const catNode = nodes.find(function(n) { return n.id === catId; });
       if (catNode) {
         selectNode(catNode);
       }
     }
 
-    // Search Box
+    // Search Input
     const searchBox = document.getElementById('search-box');
     searchBox.addEventListener('input', function(e) {
       filterQuery = e.target.value.toLowerCase().trim();
@@ -892,14 +1154,23 @@ def build_viewer():
       }
     });
 
-    const btnReset = document.getElementById('btn-reset');
-    btnReset.addEventListener('click', function() {
-      targetTransform = { x: 0, y: 0, scale: 1.0 };
-      selectedNode = null;
-      filterQuery = '';
-      searchBox.value = '';
+    // View Mode Toggle (3D Sphere vs 2D Constellation)
+    const btnMode = document.getElementById('btn-mode');
+    btnMode.addEventListener('click', function() {
+      is3DMode = !is3DMode;
+      btnMode.textContent = is3DMode ? '🌐 3D Sphere' : '🌌 2D Constellation';
+      btnMode.classList.toggle('active', is3DMode);
     });
 
+    // Orbit Toggle
+    const btnRotate = document.getElementById('btn-rotate');
+    btnRotate.addEventListener('click', function() {
+      autoRotate = !autoRotate;
+      btnRotate.textContent = autoRotate ? '✨ Orbit' : '✨ Orbit: Off';
+      btnRotate.classList.toggle('active', autoRotate);
+    });
+
+    // Labels Toggle
     const btnLabels = document.getElementById('btn-labels');
     btnLabels.addEventListener('click', function() {
       showLabels = !showLabels;
@@ -907,77 +1178,113 @@ def build_viewer():
       btnLabels.classList.toggle('active', showLabels);
     });
 
+    // Reset Camera
+    const btnReset = document.getElementById('btn-reset');
+    btnReset.addEventListener('click', function() {
+      rotX = -0.32;
+      rotY = 0.55;
+      targetRotX = null;
+      targetRotY = null;
+      zoom3D = 1.0;
+      pan3D = { x: 0, y: 0 };
+      transform2D = { x: 0, y: 0, scale: 1.0 };
+      targetTransform2D = null;
+      selectedNode = null;
+      filterQuery = '';
+      searchBox.value = '';
+      document.querySelectorAll('.cat-chip').forEach(function(c) { c.classList.remove('active'); });
+    });
+
+    // Detailed Obsidian Inspector Sidebar
     function displayNodeDetails(node) {
       const badge = document.getElementById('badge-type');
       const title = document.getElementById('node-title');
       const desc = document.getElementById('node-desc');
       const container = document.getElementById('dynamic-sections');
 
-      badge.textContent = node.type.replace('_', ' ').toUpperCase();
-      badge.style.background = 'rgba(255, 255, 255, 0.08)';
-      badge.style.color = '#e5e7eb';
+      badge.textContent = node.type.replace(/_/g, ' ').toUpperCase();
+      badge.style.background = 'rgba(' + hexToRgb(node.categoryColor || '#3b82f6') + ', 0.18)';
+      badge.style.color = node.categoryColor || '#93c5fd';
 
       title.textContent = node.label;
       desc.textContent = node.description || 'Knowledge graph operational entity.';
 
       let html = '';
 
+      // Direct Connected Neighbors list
+      const connectedEdges = links.filter(function(l) { return l.sourceNode === node || l.targetNode === node; });
+      const neighborNodes = connectedEdges.map(function(l) { return l.sourceNode === node ? l.targetNode : l.sourceNode; });
+
+      // Breadcrumb context
+      let breadcrumb = '';
+      if (node.cat_id) {
+        const cat = graphData.categories.find(function(c) { return c.id === node.cat_id; });
+        if (cat) breadcrumb += '<span>' + cat.name + '</span>';
+      }
+      if (node.properties && node.properties.code) {
+        breadcrumb += ' <span>›</span> <span>' + node.properties.code + '</span>';
+      }
+      if (breadcrumb) {
+        html += '<div class="breadcrumb-path">' + breadcrumb + '</div>';
+      }
+
+      // If Category: List CARC Codes
       if (node.type === 'category') {
         const childCodes = links.filter(function(l) { return l.sourceNode === node; }).map(function(l) { return l.targetNode; });
-        html += '<div class="section-card"><h4><span>📑</span> Denial Codes (' + childCodes.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
+        html += '<div class="section-card"><h4><span>📑</span> Included Denial Codes (' + childCodes.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
         childCodes.forEach(function(c) {
-          html += '<div class="sub-item-link" onclick="window.selectNodeById(\\'' + c.id + '\\')"><strong>' + c.label + '</strong><div style="font-size: 11px; color: #6b7280; margin-top: 2px;">' + (c.description || '') + '</div></div>';
+          html += '<div class="sub-item-link" onclick="window.selectNodeById(\\'' + c.id + '\\')"><strong>' + c.label + '</strong><div style="font-size: 11px; color: #848e9c; margin-top: 2px;">' + (c.description || '') + '</div></div>';
         });
         html += '</div></div>';
       }
 
+      // If Denial Code: List Scenarios
       if (node.type === 'denial_code') {
-        const codeKey = node.properties.code || node.label.split(':')[0].trim();
-        const connectedScenarios = nodes.filter(function(n) {
-          return n.type === 'scenario' && n.properties && n.properties.code === codeKey;
-        });
-        html += '<div class="section-card"><h4><span>📂</span> Associated Scenarios (' + connectedScenarios.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
-        connectedScenarios.forEach(function(s) {
-          html += '<div class="sub-item-link" onclick="window.selectNodeById(\\'' + s.id + '\\')"><strong>' + s.label + '</strong><div style="font-size: 11px; color: #6b7280; margin-top: 2px;">' + (s.description || '') + '</div></div>';
+        const childScenarios = links.filter(function(l) { return l.sourceNode === node; }).map(function(l) { return l.targetNode; });
+        html += '<div class="section-card"><h4><span>📂</span> Clinical Scenarios (' + childScenarios.length + ')</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
+        childScenarios.forEach(function(s) {
+          html += '<div class="sub-item-link" onclick="window.selectNodeById(\\'' + s.id + '\\')"><strong>' + s.label + '</strong><div style="font-size: 11px; color: #848e9c; margin-top: 2px;">' + (s.description || '') + '</div></div>';
         });
         html += '</div></div>';
       }
 
+      // If Scenario: Show Investigation, CMS-1500, Script, Action Plan, Notes
       if (node.type === 'scenario') {
         const children = links.filter(function(l) { return l.sourceNode === node; }).map(function(l) { return l.targetNode; });
-        const inv = children.find(function(c) { return c.type === 'investigation_step'; });
-        const form = children.find(function(c) { return c.type === 'form_requirement'; });
-        const script = children.find(function(c) { return c.type === 'payer_question'; });
-        const act = children.find(function(c) { return c.type === 'action_plan'; });
+        const invNodes = children.filter(function(c) { return c.type === 'investigation_step'; });
+        const callNodes = children.filter(function(c) { return c.type === 'payer_question'; });
+        const formNode = children.find(function(c) { return c.type === 'form_requirement'; });
+        const actNodes = children.filter(function(c) { return c.type === 'action_plan'; });
 
-        if (inv && inv.properties && inv.properties.steps) {
-          html += '<div class="section-card"><h4><span>🔍</span> Investigation Checklist</h4>';
-          inv.properties.steps.forEach(function(s) {
-            html += '<div class="checklist-item">' + s + '</div>';
+        if (invNodes.length > 0) {
+          html += '<div class="section-card"><h4><span>🔍</span> Investigation Checklist (' + invNodes.length + ' Checks)</h4>';
+          invNodes.forEach(function(item) {
+            html += '<div class="checklist-item">' + (item.description || item.label) + '</div>';
           });
           html += '</div>';
         }
 
-        if (form && form.properties) {
-          html += '<div class="section-card"><h4><span>📋</span> CMS-1500 & Clearinghouse Fields</h4><div style="font-size: 11.5px; color: #d1d5db; line-height: 1.5;"><strong>Form:</strong> ' + (form.properties.form_name || 'CMS-1500') + '<br/><strong>Box/Segment:</strong> <span style="color: #93c5fd; font-weight: 600;">' + (form.properties.box_number || 'N/A') + '</span></div>';
-          if (form.properties.required_documents) {
-            html += '<div style="margin-top: 6px; font-size: 11px; color: #6b7280;"><strong>Required Attachments:</strong> ' + form.properties.required_documents.join(', ') + '</div>';
+        if (formNode && formNode.properties) {
+          html += '<div class="section-card"><h4><span>📋</span> CMS-1500 & Clearinghouse Fields</h4><div style="font-size: 12px; color: #d1d5db; line-height: 1.5;"><strong>Form:</strong> ' + (formNode.properties.form_name || 'CMS-1500') + '<br/><strong>Box / Segment:</strong> <span style="color: #93c5fd; font-weight: 600;">' + (formNode.properties.box_number || 'Field Spec') + '</span></div>';
+          if (formNode.properties.required_documents) {
+            html += '<div style="margin-top: 6px; font-size: 11px; color: #848e9c;"><strong>Required Attachments:</strong> ' + formNode.properties.required_documents.join(', ') + '</div>';
           }
           html += '</div>';
         }
 
-        if (script && script.properties) {
+        if (callNodes.length > 0) {
           html += '<div class="section-card"><h4><span>📞</span> Payer Call Script Questions</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
-          for (let k in script.properties) {
-            html += '<div class="script-item"><strong>' + k.toUpperCase() + ':</strong> "' + script.properties[k] + '"</div>';
-          }
+          callNodes.forEach(function(cq) {
+            const key = (cq.properties && cq.properties.question_key) ? cq.properties.question_key.toUpperCase() : 'CALL SCRIPT';
+            html += '<div class="script-item"><strong>' + key + ':</strong> "' + (cq.description || cq.label) + '"</div>';
+          });
           html += '</div></div>';
         }
 
-        if (act && act.properties && act.properties.steps) {
+        if (actNodes.length > 0) {
           html += '<div class="section-card"><h4><span>⚡</span> Step-by-Step Resolution Playbook</h4><div style="display: flex; flex-direction: column; gap: 6px;">';
-          act.properties.steps.forEach(function(s) {
-            html += '<div style="font-size: 11.5px; color: #e5e7eb; line-height: 1.4;">✓ ' + s + '</div>';
+          actNodes.forEach(function(act, idx) {
+            html += '<div style="font-size: 12px; color: #e5e7eb; line-height: 1.4;"><span style="color: #6ee7b7; font-weight: 600;">' + (idx + 1) + '.</span> ' + (act.description || act.label) + '</div>';
           });
           html += '</div></div>';
         }
@@ -987,7 +1294,31 @@ def build_viewer():
         }
       }
 
-      container.innerHTML = html || '<div class="hint-box">Select a node in the constellation to inspect its investigation checklist and resolution steps.</div>';
+      // If Leaf Node (Investigation, Call, Form, Action): Link back to parent Scenario
+      if (node.type === 'investigation_step' || node.type === 'payer_question' || node.type === 'form_requirement' || node.type === 'action_plan') {
+        const parentScenario = neighborNodes.find(function(n) { return n.type === 'scenario'; });
+        if (parentScenario) {
+          html += '<div class="section-card"><h4><span>📂</span> Parent Clinical Scenario</h4><div class="sub-item-link" onclick="window.selectNodeById(\\'' + parentScenario.id + '\\')"><strong>' + parentScenario.label + '</strong><div style="font-size: 11px; color: #848e9c; margin-top: 2px;">' + (parentScenario.description || '') + '</div></div></div>';
+        }
+      }
+
+      // Direct Connected Nodes Section
+      if (neighborNodes.length > 0 && node.type !== 'category') {
+        html += '<div class="section-card"><h4><span>🔗</span> Connected Nodes (' + neighborNodes.length + ')</h4><div style="display: flex; flex-wrap: wrap; gap: 6px;">';
+        neighborNodes.slice(0, 10).forEach(function(nbr) {
+          html += '<button class="ctrl-btn" style="font-size: 10.5px; padding: 4px 8px;" onclick="window.selectNodeById(\\'' + nbr.id + '\\')">' + nbr.label.slice(0, 22) + '</button>';
+        });
+        html += '</div></div>';
+      }
+
+      container.innerHTML = html || '<div class="hint-box">Select a node in the constellation to inspect its clinical root cause and resolution playbook.</div>';
+    }
+
+    function hexToRgb(hex) {
+      hex = hex.replace('#', '');
+      if (hex.length === 3) hex = hex[0]+hex[0]+hex[1]+hex[1]+hex[2]+hex[2];
+      const num = parseInt(hex, 16);
+      return (num >> 16) + ', ' + ((num >> 8) & 255) + ', ' + (num & 255);
     }
 
     window.copyNotes = function() {
@@ -1016,7 +1347,7 @@ def build_viewer():
     with open(out_path, "w", encoding="utf-8") as f:
         f.write(html_content)
 
-    print(f"Obsidian-Style Graph Viewer successfully built at: {out_path} ({len(html_content)} bytes)")
+    print(f"Obsidian-Style Spherical Knowledge Graph Viewer successfully built at: {out_path} ({len(html_content)} bytes)")
 
 if __name__ == "__main__":
     build_viewer()
