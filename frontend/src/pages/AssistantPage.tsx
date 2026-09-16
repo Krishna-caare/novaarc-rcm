@@ -172,13 +172,20 @@ I'll provide instant answers with data from your RCM system.`,
         </div>
 
         {loading && (
-          <div className="flex gap-3 mb-4">
-            <div className="w-8 h-8 rounded-full bg-purple-100 text-purple-600 flex items-center justify-center flex-shrink-0">
-              <Loader2 className="w-5 h-5 animate-spin" />
+          <div className="flex gap-3 mb-4 animate-fade-in">
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-purple-600 to-indigo-600 text-white flex items-center justify-center flex-shrink-0 shadow-xs">
+              <Sparkles className="w-4 h-4 animate-spin" />
             </div>
-            <div className="bg-white border border-slate-200 rounded-2xl rounded-tl-none px-4 py-2 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin text-primary-600" />
-              <span className="text-sm text-slate-600">Thinking...</span>
+            <div className="bg-white border border-slate-200/90 rounded-2xl rounded-tl-none px-4 py-3 shadow-xs space-y-1.5">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1">
+                  <span className="w-2 h-2 rounded-full bg-blue-600 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-indigo-600 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <span className="w-2 h-2 rounded-full bg-purple-600 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-xs font-semibold text-slate-700">NovaArc AI is analyzing revenue cycle data...</span>
+              </div>
+              <p className="text-2xs text-slate-400">Synthesizing SQL queries, denial patterns & AR intelligence</p>
             </div>
           </div>
         )}

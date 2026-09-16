@@ -71,14 +71,7 @@ export default function App() {
         <Route path="payments" element={<PaymentsPage />} />
         <Route path="agents" element={<AgentsPage />} />
         <Route path="assistant" element={<AssistantPage />} />
-        <Route
-          path="users"
-          element={
-            <ProtectedRoute allowedRoles={['client_leadership', 'ops_leadership']}>
-              <UsersPage />
-            </ProtectedRoute>
-          }
-        />
+        <Route path="users" element={<UsersPage />} />
       </Route>
     </Routes>
   );

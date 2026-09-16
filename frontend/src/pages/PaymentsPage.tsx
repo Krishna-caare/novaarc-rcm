@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { formatCurrency, formatDate, formatNumber } from '../lib/utils';
 import { Payment } from '../types';
-import { ChevronLeft, ChevronRight, Filter, Plus, Eye, CreditCard, DollarSign, TrendingUp } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Filter, Plus, Eye, CreditCard, DollarSign, TrendingUp, X } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
 
 export function PaymentsPage() {
@@ -11,6 +11,8 @@ export function PaymentsPage() {
   const [loading, setLoading] = useState(false);
   const [summaryLoading, setSummaryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
+  const [showViewPayment, setShowViewPayment] = useState(false);
   const [pagination, setPagination] = useState({ page: 1, limit: 20 });
   const [filters, setFilters] = useState({ claim_id: '', payer_id: '', date_from: '', date_to: '' });
   const [showFilters, setShowFilters] = useState(false);
@@ -257,17 +259,17 @@ export function PaymentsPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="bg-slate-50 text-left text-sm text-slate-500 border-b border-slate-200">
+                  <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                     <th className="px-4 py-3">Payment ID</th>
                     <th className="px-4 py-3">Claim</th>
                     <th className="px-4 py-3">Amount</th>
                     <th className="px-4 py-3">Posted Date</th>
                     <th className="px-4 py-3">Remittance Ref</th>
                     <th className="px-4 py-3">Payer</th>
-                    <th className="px-4 py-3">Actions</th>
+                    <th className="px-4 py-3 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody className="divide-y divide-slate-100 text-sm">
                   {payments.length === 0 ? (
                     <tr>
                       <td colSpan={7} className="px-4 py-12 text-center text-slate-500">
@@ -276,16 +278,25 @@ export function PaymentsPage() {
                     </tr>
                   ) : (
                     payments.map((payment) => (
-                      <tr key={payment.payment_id} className="hover:bg-slate-50 border-b border-slate-100">
-                        <td className="px-4 py-3 font-mono text-sm text-slate-900">PMT-{payment.payment_id}</td>
-                        <td className="px-4 py-3 text-slate-600">CLM-{payment.claim_id}</td>
-                        <td className="px-4 py-3 font-medium text-slate-900">{formatCurrency(payment.amount)}</td>
+                      <tr key={payment.payment_id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-4 py-3 font-mono font-semibold text-slate-900">PMT-{payment.payment_id}</td>
+                        <td className="px-4 py-3 text-blue-600 font-mono font-medium">CLM-{payment.claim_id}</td>
+                        <td className="px-4 py-3 font-semibold text-emerald-700">{formatCurrency(payment.amount)}</td>
                         <td className="px-4 py-3 text-slate-600">{formatDate(payment.posted_date)}</td>
-                        <td className="px-4 py-3 text-slate-600 font-mono text-sm">{payment.remittance_ref || 'N/A'}</td>
-                        <td className="px-4 py-3 text-slate-600">Payer {payment.payer_id}</td>
-                        <td className="px-4 py-3">
-                          <button className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="View">
-                            <Eye className="w-4 h-4" />
+                        <td className="px-4 py-3 text-slate-600 font-mono text-xs">{payment.remittance_ref || 'N/A'}</td>
+                        <td className="px-4 py-3 text-slate-700 font-medium">
+                          {payers.find(p => p.payer_id === payment.payer_id)?.name || `Payer #${payment.payer_id}`}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedPayment(payment);
+                              setShowViewPayment(true);
+                            }}
+                            className="p-1.5 rounded-lg hover:bg-blue-50 text-slate-400 hover:text-blue-600 transition-colors inline-flex items-center justify-center"
+                            title="View Payment Details"
+                          >
+                            <Eye className="w-4.5 h-4.5" />
                           </button>
                         </td>
                       </tr>
@@ -317,7 +328,7 @@ export function PaymentsPage() {
           </CardContent>
         </Card>
 
-        {summary?.by_payer && summary.by_payer.length > 0 && (
+        {summary && summary.by_payer.length > 0 && (
           <Card>
             <CardHeader>
               <CardTitle>Payments by Payer</CardTitle>
@@ -326,18 +337,18 @@ export function PaymentsPage() {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="text-left text-sm text-slate-500 border-b border-slate-200">
+                    <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                       <th className="px-4 py-3">Payer ID</th>
                       <th className="px-4 py-3">Payment Count</th>
                       <th className="px-4 py-3">Total Amount</th>
                     </tr>
                   </thead>
-                  <tbody>
+                  <tbody className="divide-y divide-slate-100 text-sm">
                     {summary.by_payer.map((p) => (
-                      <tr key={p.payer_id} className="hover:bg-slate-50 border-b border-slate-100">
-                        <td className="px-4 py-3 text-slate-600">Payer {p.payer_id}</td>
+                      <tr key={p.payer_id} className="hover:bg-slate-50/80 transition-colors">
+                        <td className="px-4 py-3 text-slate-700 font-medium">Payer {p.payer_id}</td>
                         <td className="px-4 py-3 text-slate-600">{formatNumber(p.count)}</td>
-                        <td className="px-4 py-3 font-medium text-slate-900">{formatCurrency(p.total_amount)}</td>
+                        <td className="px-4 py-3 font-semibold text-emerald-700">{formatCurrency(p.total_amount)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -444,6 +455,72 @@ export function PaymentsPage() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        )}
+        {/* ── View Payment Modal ────────────────────────────────────── */}
+        {showViewPayment && selectedPayment && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden flex flex-col border border-slate-200 animate-slide-up">
+              <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                    <CreditCard className="w-4.5 h-4.5" />
+                  </div>
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Payment Details</h3>
+                    <p className="font-mono text-xs text-slate-500">PMT-{selectedPayment.payment_id}</p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowViewPayment(false)}
+                  className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <div className="p-6 space-y-4 text-xs">
+                <div className="p-4 bg-slate-50 rounded-xl border border-slate-200/80 flex items-center justify-between">
+                  <span className="text-slate-500 font-medium">Payment Amount</span>
+                  <span className="text-lg font-bold text-emerald-600">
+                    {formatCurrency(selectedPayment.amount)}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                    <p className="text-2xs font-semibold text-slate-400 uppercase">Claim ID</p>
+                    <p className="font-mono font-bold text-blue-600 mt-1">CLM-{selectedPayment.claim_id}</p>
+                  </div>
+                  <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                    <p className="text-2xs font-semibold text-slate-400 uppercase">Posted Date</p>
+                    <p className="font-medium text-slate-800 mt-1">{formatDate(selectedPayment.posted_date)}</p>
+                  </div>
+                </div>
+
+                <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                  <p className="text-2xs font-semibold text-slate-400 uppercase">Remittance Reference</p>
+                  <p className="font-mono font-medium text-slate-900 mt-1">{selectedPayment.remittance_ref || 'N/A'}</p>
+                </div>
+
+                <div className="p-3 bg-white border border-slate-200 rounded-lg">
+                  <p className="text-2xs font-semibold text-slate-400 uppercase">Payer</p>
+                  <p className="font-medium text-slate-900 mt-1">
+                    {payers.find(p => p.payer_id === selectedPayment.payer_id)?.name || `Payer ID #${selectedPayment.payer_id}`}
+                  </p>
+                </div>
+              </div>
+
+              <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/70 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowViewPayment(false)}
+                  className="btn-secondary text-xs"
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
         )}

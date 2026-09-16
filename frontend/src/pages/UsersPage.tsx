@@ -144,7 +144,7 @@ export function UsersPage() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="bg-slate-50 text-left text-sm text-slate-500 border-b border-slate-200">
+                      <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                         <th className="px-4 py-3">User</th>
                         <th className="px-4 py-3">Email</th>
                         <th className="px-4 py-3">Role</th>
@@ -153,7 +153,7 @@ export function UsersPage() {
                         <th className="px-4 py-3">Actions</th>
                       </tr>
                     </thead>
-                    <tbody>
+                    <tbody className="divide-y divide-slate-100 text-sm">
                       {users.length === 0 ? (
                         <tr>
                           <td colSpan={6} className="px-4 py-12 text-center text-slate-500">
@@ -162,7 +162,7 @@ export function UsersPage() {
                         </tr>
                       ) : (
                         users.map((user) => (
-                          <tr key={user.user_id} className="hover:bg-slate-50 border-b border-slate-100">
+                          <tr key={user.user_id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-full bg-primary-100 flex items-center justify-center">

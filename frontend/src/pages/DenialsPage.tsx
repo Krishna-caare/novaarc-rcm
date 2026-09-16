@@ -2,12 +2,25 @@ import { useEffect, useState } from 'react';
 import { api } from '../services/api';
 import { formatCurrency, formatDate, formatNumber } from '../lib/utils';
 import { Denial, AppealStatus } from '../types';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { 
+  ChevronLeft, ChevronRight, Sparkles, Copy, Check, X, 
+  AlertTriangle, ShieldAlert, FileText, CheckCircle2, 
+  RefreshCw, TrendingUp, DollarSign, Bot, ArrowRight
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/Card';
+
+interface TopCodeItem {
+  denial_code: string;
+  count: number;
+  total_denied?: number;
+  total_denied_amount?: number;
+  avg_denied?: number;
+  avg_denied_amount?: number;
+}
 
 export function DenialsPage() {
   const [denials, setDenials] = useState<Denial[]>([]);
-  const [topCodes, setTopCodes] = useState<Array<{denial_code: string; count: number; total_denied: number; avg_denied: number}>>([]);
+  const [topCodes, setTopCodes] = useState<TopCodeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [codesLoading, setCodesLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -15,12 +28,25 @@ export function DenialsPage() {
   const [selectedDenial, setSelectedDenial] = useState<Denial | null>(null);
   const [appealDraft, setAppealDraft] = useState<string>('');
   const [draftingAppeal, setDraftingAppeal] = useState(false);
+  const [activeDraftingId, setActiveDraftingId] = useState<number | null>(null);
   const [appealContext, setAppealContext] = useState('');
+  const [copied, setCopied] = useState(false);
+  const [filterCode, setFilterCode] = useState<string | null>(null);
+  const [aiLoadingStep, setAiLoadingStep] = useState(0);
 
   useEffect(() => {
     fetchDenials();
     fetchTopCodes();
   }, [pagination.page]);
+
+  // AI loading step ticker animation
+  useEffect(() => {
+    if (!draftingAppeal) return;
+    const interval = setInterval(() => {
+      setAiLoadingStep((prev) => (prev + 1) % 3);
+    }, 1400);
+    return () => clearInterval(interval);
+  }, [draftingAppeal]);
 
   const fetchDenials = async () => {
     setLoading(true);
@@ -49,28 +75,61 @@ export function DenialsPage() {
   const handleDraftAppeal = async (denial: Denial) => {
     setSelectedDenial(denial);
     setDraftingAppeal(true);
+    setActiveDraftingId(denial.denial_id);
+    setAppealDraft('');
+    setCopied(false);
+    setAiLoadingStep(0);
+
     try {
       const result = await api.draftAppeal(denial.denial_id, appealContext);
-      setAppealDraft(result.appeal_letter);
+      setAppealDraft(result.appeal_letter || '');
+      // Update local denial status so table reflects AI drafted badge immediately
+      setDenials((prev) =>
+        prev.map((d) =>
+          d.denial_id === denial.denial_id
+            ? { ...d, appeal_status: 'drafted', appeal_drafted_by_ai: true }
+            : d
+        )
+      );
     } catch (err: any) {
-      setError(err.response?.data?.detail || 'Failed to draft appeal');
+      setError(err.response?.data?.detail || 'Failed to draft appeal letter');
+    } finally {
+      setDraftingAppeal(false);
+      setActiveDraftingId(null);
+    }
+  };
+
+  const handleRegenerateAppeal = async () => {
+    if (!selectedDenial) return;
+    setDraftingAppeal(true);
+    setCopied(false);
+    setAiLoadingStep(0);
+    try {
+      const result = await api.draftAppeal(selectedDenial.denial_id, appealContext);
+      setAppealDraft(result.appeal_letter || '');
+    } catch (err: any) {
+      setError(err.response?.data?.detail || 'Failed to regenerate appeal');
     } finally {
       setDraftingAppeal(false);
     }
   };
 
-  const handleAppealContextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setAppealContext(e.target.value);
+  const handleCopy = () => {
+    if (!appealDraft) return;
+    navigator.clipboard.writeText(appealDraft);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
   };
 
   const closeAppealModal = () => {
     setSelectedDenial(null);
     setAppealDraft('');
     setAppealContext('');
+    setCopied(false);
   };
 
-  const formatAppealStatus = (status: AppealStatus) => {
-    const labels: Record<AppealStatus, string> = {
+  const formatAppealStatus = (status: AppealStatus | string) => {
+    const labels: Record<string, string> = {
       not_started: 'Not Started',
       drafted: 'Drafted',
       submitted: 'Submitted',
@@ -80,195 +139,507 @@ export function DenialsPage() {
     return labels[status] || status;
   };
 
-  const getAppealStatusBadge = (status: AppealStatus) => {
-    const badges: Record<AppealStatus, string> = {
-      not_started: 'badge-neutral',
-      drafted: 'badge-info',
-      submitted: 'badge-warning',
-      won: 'badge-success',
-      lost: 'badge-danger',
-    };
-    return badges[status] || 'badge-neutral';
+  const getAppealStatusBadge = (status: AppealStatus | string) => {
+    switch (status) {
+      case 'won':
+        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+      case 'drafted':
+        return 'bg-blue-50 text-blue-700 border-blue-200';
+      case 'submitted':
+        return 'bg-amber-50 text-amber-700 border-amber-200';
+      case 'lost':
+        return 'bg-rose-50 text-rose-700 border-rose-200';
+      default:
+        return 'bg-slate-50 text-slate-600 border-slate-200';
+    }
   };
 
+  // Filtered denials
+  const displayedDenials = filterCode
+    ? denials.filter((d) => d.denial_code === filterCode)
+    : denials;
+
+  // KPI Calculations
+  const totalDeniedSum = denials.reduce((sum, d) => sum + (d.denied_amount || 0), 0);
+  const draftedCount = denials.filter((d) => d.appeal_status === 'drafted' || d.appeal_drafted_by_ai).length;
+  const topCodeItem = topCodes[0];
+
   return (
-          <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+    <div className="space-y-6 max-w-[1600px] mx-auto animate-fade-in">
+      {/* ── Page Header ────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2.5">
+            <ShieldAlert className="w-6 h-6 text-blue-600" />
+            Denials Management
+          </h1>
+          <p className="text-sm text-slate-500 mt-1">
+            Monitor denial trends, analyze root causes, and generate automated AI appeal letters
+          </p>
+        </div>
+        {filterCode && (
+          <button
+            onClick={() => setFilterCode(null)}
+            className="self-start sm:self-auto inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-white border border-slate-200 rounded-lg hover:bg-slate-50"
+          >
+            <span>Filtering by <strong className="text-blue-600">{filterCode}</strong></span>
+            <X className="w-3.5 h-3.5 text-slate-400" />
+          </button>
+        )}
+      </div>
+
+      {error && (
+        <div className="bg-rose-50 border border-rose-200 text-rose-700 px-4 py-3 rounded-xl flex items-center justify-between text-sm animate-slide-down">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+            <span>{error}</span>
+          </div>
+          <button onClick={() => setError(null)} className="text-rose-500 hover:text-rose-700">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* ── Top Summary KPI Cards ────────────────────────────────── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0">
+            <ShieldAlert className="w-5 h-5" />
+          </div>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">Denials</h1>
-            <p className="text-slate-600">Track and manage claim denials</p>
+            <p className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">Total Denials</p>
+            <p className="text-xl font-bold text-slate-900 mt-0.5">{formatNumber(denials.length)}</p>
           </div>
         </div>
 
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
-            {error}
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 flex items-center justify-center flex-shrink-0">
+            <DollarSign className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">Total Value Denied</p>
+            <p className="text-xl font-bold text-slate-900 mt-0.5">{formatCurrency(totalDeniedSum)}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center flex-shrink-0">
+            <Sparkles className="w-5 h-5" />
+          </div>
+          <div>
+            <p className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">AI Appeals Drafted</p>
+            <p className="text-xl font-bold text-purple-700 mt-0.5">{formatNumber(draftedCount)}</p>
+          </div>
+        </div>
+
+        <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs flex items-center gap-3.5">
+          <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0">
+            <TrendingUp className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-2xs font-semibold text-slate-400 uppercase tracking-wider">Top Denial Code</p>
+            <p className="text-xl font-bold text-slate-900 mt-0.5 truncate">
+              {topCodeItem ? topCodeItem.denial_code : 'N/A'}
+              <span className="text-xs font-normal text-slate-500 ml-1.5">
+                ({topCodeItem ? `${topCodeItem.count} claims` : ''})
+              </span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Top Denial Codes Horizontal Ribbon ─────────────────────── */}
+      <div className="bg-white p-4 rounded-xl border border-slate-200/80 shadow-xs">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <FileText className="w-4 h-4 text-blue-600" />
+            <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">Top Denial Reason Codes (CARC)</span>
+          </div>
+          <span className="text-xs text-slate-400">Click a code to filter claims</span>
+        </div>
+
+        {codesLoading ? (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
+            {[1, 2, 3, 4, 5].map((i) => (
+              <div key={i} className="h-14 bg-slate-100 rounded-lg animate-pulse" />
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2.5">
+            {topCodes.slice(0, 5).map((code) => {
+              const total = code.total_denied ?? code.total_denied_amount ?? 0;
+              const avg = code.avg_denied ?? code.avg_denied_amount ?? 0;
+              const isSelected = filterCode === code.denial_code;
+
+              return (
+                <button
+                  key={code.denial_code}
+                  type="button"
+                  onClick={() => setFilterCode(isSelected ? null : code.denial_code)}
+                  className={`text-left p-2.5 rounded-lg border transition-all ${
+                    isSelected
+                      ? 'bg-blue-50 border-blue-300 ring-2 ring-blue-500/20 shadow-xs'
+                      : 'bg-slate-50/70 border-slate-200/70 hover:bg-slate-100/80 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-mono text-xs font-bold text-blue-700">{code.denial_code}</span>
+                    <span className="text-2xs font-semibold px-1.5 py-0.5 rounded bg-white text-slate-600 border border-slate-200">
+                      {code.count}
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between text-2xs">
+                    <span className="font-semibold text-slate-800">{formatCurrency(total)}</span>
+                    <span className="text-slate-400">Avg: {formatCurrency(avg)}</span>
+                  </div>
+                </button>
+              );
+            })}
           </div>
         )}
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2">
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Denial List</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="bg-slate-50 text-left text-sm text-slate-500 border-b border-slate-200">
-                        <th className="px-4 py-3">Denial ID</th>
-                        <th className="px-4 py-3">Claim</th>
-                        <th className="px-4 py-3">Code</th>
-                        <th className="px-4 py-3">Description</th>
-                        <th className="px-4 py-3">Denied Amt</th>
-                        <th className="px-4 py-3">Date</th>
-                        <th className="px-4 py-3">Root Cause</th>
-                        <th className="px-4 py-3">Appeal Status</th>
-                        <th className="px-4 py-3">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {denials.length === 0 ? (
-                        <tr>
-                          <td colSpan={9} className="px-4 py-12 text-center text-slate-500">
-                            No denials found
-                          </td>
-                        </tr>
-                      ) : (
-                        denials.map((denial) => (
-                          <tr key={denial.denial_id} className="hover:bg-slate-50 border-b border-slate-100">
-                            <td className="px-4 py-3 font-mono text-sm text-slate-900">DNL-{denial.denial_id}</td>
-                            <td className="px-4 py-3 text-slate-600">CLM-{denial.claim_id}</td>
-                            <td className="px-4 py-3 font-mono text-sm text-slate-900">{denial.denial_code || 'N/A'}</td>
-                            <td className="px-4 py-3 text-slate-600 max-w-xs truncate">
-                              {denial.description || 'N/A'}
-                            </td>
-                            <td className="px-4 py-3 text-slate-600">{formatCurrency(denial.denied_amount || 0)}</td>
-                            <td className="px-4 py-3 text-slate-600">{formatDate(denial.denial_date)}</td>
-                            <td className="px-4 py-3 text-slate-600">{denial.root_cause || 'N/A'}</td>
-                            <td className="px-4 py-3">
-                              <span className={getAppealStatusBadge(denial.appeal_status)}>
-                                {formatAppealStatus(denial.appeal_status)}
-                              </span>
-                              {denial.appeal_drafted_by_ai && (
-                                <span className="ml-1 px-1.5 py-0.5 text-xs bg-purple-100 text-purple-800 rounded">AI</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => handleDraftAppeal(denial)}
-                                  disabled={draftingAppeal}
-                                  className="btn-primary text-sm px-3 py-1"
-                                >
-                                  {draftingAppeal ? 'Drafting...' : 'Draft Appeal'}
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-                <div className="px-4 py-3 border-t border-slate-200 flex items-center justify-between">
-                  <p className="text-sm text-slate-600">Showing {denials.length} denials</p>
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page - 1 }))}
-                      disabled={pagination.page === 1 || loading}
-                      className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50"
-                    >
-                      <ChevronLeft className="w-4 h-4" />
-                    </button>
-                    <span className="text-sm text-slate-600">Page {pagination.page}</span>
-                    <button
-                      onClick={() => setPagination(prev => ({ ...prev, page: prev.page + 1 }))}
-                      disabled={denials.length < pagination.limit || loading}
-                      className="p-2 rounded-lg hover:bg-slate-100 disabled:opacity-50"
-                    >
-                      <ChevronRight className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+      {/* ── Full Width Denial List Table ───────────────────────────── */}
+      <div className="bg-white rounded-xl border border-slate-200/80 shadow-xs overflow-hidden">
+        <div className="px-5 py-4 border-b border-slate-200/80 flex items-center justify-between bg-slate-50/50">
+          <div className="flex items-center gap-2">
+            <h2 className="text-base font-bold text-slate-800">Denial List</h2>
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-200/60 text-slate-700">
+              {displayedDenials.length} records
+            </span>
           </div>
-
-          <div>
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Denial Codes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                {codesLoading ? (
-                  <div className="space-y-3">
-                    {[1,2,3,4,5].map(i => (
-                      <div key={i} className="h-12 bg-slate-100 rounded animate-pulse" />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {topCodes.slice(0, 10).map((code, index) => (
-                      <div key={code.denial_code} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-                        <div className="flex items-center gap-3">
-                          <span className="text-sm text-slate-500">{index + 1}.</span>
-                          <div>
-                            <p className="font-mono font-medium text-slate-900">{code.denial_code}</p>
-                            <p className="text-xs text-slate-500">{formatNumber(code.count)} denials</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="font-medium text-slate-900">{formatCurrency(code.total_denied)}</p>
-                          <p className="text-xs text-slate-500">Avg: {formatCurrency(code.avg_denied)}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
+          {filterCode && (
+            <span className="text-xs text-blue-600 font-medium">
+              Filtered by: {filterCode}
+            </span>
+          )}
         </div>
 
-        {selectedDenial && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <div className="bg-white rounded-xl shadow-xl max-w-3xl w-full max-h-[80vh] overflow-hidden flex flex-col">
-              <div className="p-4 border-b border-slate-200 flex items-center justify-between">
-                <h2 className="text-lg font-semibold text-slate-900">Appeal Letter Draft</h2>
-                <button onClick={closeAppealModal} className="p-2 rounded-lg hover:bg-slate-100">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-              
-              <div className="p-4 border-b border-slate-200">
-                <label className="label">Additional Context (optional)</label>
-                <textarea
-                  value={appealContext}
-                  onChange={handleAppealContextChange}
-                  rows={3}
-                  className="input"
-                  placeholder="Add any additional context for the appeal..."
-                />
-              </div>
+        <div className="overflow-x-auto w-full">
+          <table className="w-full text-left border-collapse min-w-[960px]">
+            <thead>
+              <tr className="bg-slate-50 border-b border-slate-200">
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Denial ID</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Claim</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">CARC</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider">Description</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right whitespace-nowrap">Denied Amt</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Root Cause</th>
+                <th className="px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">Appeal Status</th>
+                <th className="px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wider text-right w-44 min-w-[160px] whitespace-nowrap">Action</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100 text-sm">
+              {loading ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-12 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
+                      <span>Loading denials...</span>
+                    </div>
+                  </td>
+                </tr>
+              ) : displayedDenials.length === 0 ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-12 text-center text-slate-500">
+                    No denials found matching criteria
+                  </td>
+                </tr>
+              ) : (
+                displayedDenials.map((denial) => {
+                  const isRowDrafting = activeDraftingId === denial.denial_id;
 
-              <div className="flex-1 overflow-y-auto p-4">
-                <div className="prose max-w-none">
-                  <pre className="whitespace-pre-wrap font-sans text-sm leading-relaxed">{appealDraft}</pre>
+                  return (
+                    <tr 
+                      key={denial.denial_id} 
+                      className={`hover:bg-slate-50/80 transition-colors ${
+                        isRowDrafting ? 'bg-blue-50/30' : ''
+                      }`}
+                    >
+                      <td className="px-4 py-3 font-mono font-semibold text-slate-900 whitespace-nowrap">
+                        DNL-{denial.denial_id}
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className="font-mono text-blue-600 font-medium hover:underline cursor-pointer">
+                          CLM-{denial.claim_id}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <span className="font-mono font-bold text-slate-800 px-1.5 py-0.5 rounded bg-slate-100 border border-slate-200/60 text-xs">
+                          {denial.denial_code || 'N/A'}
+                        </span>
+                      </td>
+                      <td className="px-3 py-3 text-slate-600">
+                        <div className="max-w-[200px] truncate" title={denial.description || ''}>
+                          {denial.description || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-right font-semibold text-slate-900 whitespace-nowrap">
+                        {formatCurrency(denial.denied_amount || 0)}
+                      </td>
+                      <td className="px-3 py-3 text-slate-500 whitespace-nowrap">
+                        {formatDate(denial.denial_date)}
+                      </td>
+                      <td className="px-3 py-3 text-slate-700 whitespace-nowrap">
+                        <div className="truncate max-w-[140px]" title={denial.root_cause || ''}>
+                          {denial.root_cause || 'N/A'}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 whitespace-nowrap">
+                        <div className="flex items-center gap-1.5">
+                          <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-2xs font-semibold border ${getAppealStatusBadge(denial.appeal_status)}`}>
+                            {formatAppealStatus(denial.appeal_status)}
+                          </span>
+                          {denial.appeal_drafted_by_ai && (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-2xs font-bold bg-purple-50 text-purple-700 rounded-md border border-purple-200">
+                              <Sparkles className="w-2.5 h-2.5 text-purple-600" />
+                              AI
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-right w-44 min-w-[160px] whitespace-nowrap">
+                        <button
+                          onClick={() => handleDraftAppeal(denial)}
+                          disabled={draftingAppeal}
+                          className={`inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-lg shadow-xs transition-all w-32 ${
+                            isRowDrafting
+                              ? 'bg-blue-100 text-blue-700 border border-blue-300 animate-pulse'
+                              : denial.appeal_status === 'drafted'
+                              ? 'bg-slate-100 text-slate-700 hover:bg-slate-200 border border-slate-200'
+                              : 'bg-blue-600 text-white hover:bg-blue-700 shadow-blue-500/20'
+                          }`}
+                        >
+                          {isRowDrafting ? (
+                            <>
+                              <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-600 flex-shrink-0" />
+                              Drafting...
+                            </>
+                          ) : denial.appeal_status === 'drafted' ? (
+                            <>
+                              <FileText className="w-3.5 h-3.5 text-slate-500 flex-shrink-0" />
+                              View Appeal
+                            </>
+                          ) : (
+                            <>
+                              <Sparkles className="w-3.5 h-3.5 text-white flex-shrink-0" />
+                              Draft Appeal
+                            </>
+                          )}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Table Pagination */}
+        <div className="px-5 py-3.5 border-t border-slate-200/80 bg-slate-50/50 flex items-center justify-between">
+          <p className="text-xs text-slate-500">
+            Showing <strong className="text-slate-800">{displayedDenials.length}</strong> of{' '}
+            <strong className="text-slate-800">{denials.length}</strong> denials
+          </p>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setPagination((prev) => ({ ...prev, page: Math.max(1, prev.page - 1) }))}
+              disabled={pagination.page === 1 || loading}
+              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4 text-slate-600" />
+            </button>
+            <span className="text-xs font-medium text-slate-700 px-2">Page {pagination.page}</span>
+            <button
+              onClick={() => setPagination((prev) => ({ ...prev, page: prev.page + 1 }))}
+              disabled={denials.length < pagination.limit || loading}
+              className="p-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="w-4 h-4 text-slate-600" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* ── AI Appeal Modal with Rich Loading Animation ────────────── */}
+      {selectedDenial && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[85vh] overflow-hidden flex flex-col border border-slate-200 animate-slide-up">
+            {/* Modal Header */}
+            <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between bg-slate-50/70">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shadow-xs">
+                  <Sparkles className="w-4.5 h-4.5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-slate-900">
+                    Automated Appeal Letter
+                  </h2>
+                  <p className="text-xs text-slate-500">
+                    Claim <strong className="text-blue-600">CLM-{selectedDenial.claim_id}</strong> · Denial <strong className="text-slate-700">DNL-{selectedDenial.denial_id}</strong> (Code {selectedDenial.denial_code})
+                  </p>
                 </div>
               </div>
+              <button
+                onClick={closeAppealModal}
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="p-4 border-t border-slate-200 flex justify-end gap-2">
-                <button onClick={closeAppealModal} className="btn-secondary">
-                  Close
-                </button>
-                <button className="btn-primary">
-                  Copy to Clipboard
-                </button>
-              </div>
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-6 space-y-4">
+              {draftingAppeal ? (
+                /* ── AI Working / Loading State ── */
+                <div className="py-12 px-6 flex flex-col items-center text-center space-y-6">
+                  {/* Glowing Pulse Ring */}
+                  <div className="relative">
+                    <div className="w-20 h-20 rounded-full bg-blue-100 flex items-center justify-center animate-pulse">
+                      <div className="w-14 h-14 rounded-full bg-blue-600 text-white flex items-center justify-center shadow-lg shadow-blue-500/30">
+                        <Bot className="w-7 h-7 animate-bounce" />
+                      </div>
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-6 h-6 rounded-full bg-purple-500 text-white flex items-center justify-center shadow-sm">
+                      <Sparkles className="w-3.5 h-3.5 animate-spin" />
+                    </div>
+                  </div>
+
+                  {/* Status Heading */}
+                  <div className="space-y-1.5 max-w-md">
+                    <h3 className="text-lg font-bold text-slate-900">
+                      NovaArc AI is Drafting Your Appeal Letter...
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      Powered by <span className="font-semibold text-blue-600">Ling 3.0 Flash Santé</span> & <span className="font-semibold text-indigo-600">Nemotron 3.5</span> for clinical precision and medical necessity citations.
+                    </p>
+                  </div>
+
+                  {/* Progress Checklist Steps */}
+                  <div className="w-full max-w-md bg-slate-50 rounded-xl p-4 border border-slate-200/80 text-left space-y-2.5">
+                    <div className={`flex items-center gap-2.5 text-xs transition-colors ${aiLoadingStep >= 0 ? 'text-blue-700 font-semibold' : 'text-slate-400'}`}>
+                      {aiLoadingStep > 0 ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin flex-shrink-0" />
+                      )}
+                      <span>Analyzing denial code <strong>{selectedDenial.denial_code}</strong> & root cause guidelines</span>
+                    </div>
+
+                    <div className={`flex items-center gap-2.5 text-xs transition-colors ${aiLoadingStep >= 1 ? 'text-blue-700 font-semibold' : 'text-slate-400'}`}>
+                      {aiLoadingStep > 1 ? (
+                        <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                      ) : aiLoadingStep === 1 ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin flex-shrink-0" />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border border-slate-300 flex-shrink-0" />
+                      )}
+                      <span>Retrieving payer medical necessity justifications & clinical evidence</span>
+                    </div>
+
+                    <div className={`flex items-center gap-2.5 text-xs transition-colors ${aiLoadingStep >= 2 ? 'text-blue-700 font-semibold' : 'text-slate-400'}`}>
+                      {aiLoadingStep === 2 ? (
+                        <div className="w-4 h-4 rounded-full border-2 border-blue-600 border-t-transparent animate-spin flex-shrink-0" />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border border-slate-300 flex-shrink-0" />
+                      )}
+                      <span>Drafting formal appeal narrative with ERISA & insurance code citations</span>
+                    </div>
+                  </div>
+
+                  {/* Shimmer Skeleton preview */}
+                  <div className="w-full max-w-md space-y-2 pt-2">
+                    <div className="h-3.5 bg-slate-200/70 rounded-full w-full animate-pulse" />
+                    <div className="h-3.5 bg-slate-200/70 rounded-full w-5/6 animate-pulse" />
+                    <div className="h-3.5 bg-slate-200/70 rounded-full w-4/6 animate-pulse" />
+                  </div>
+                </div>
+              ) : (
+                /* ── Letter Generated View ── */
+                <>
+                  {/* Context Input */}
+                  <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-200">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-xs font-semibold text-slate-700">
+                        Additional Appeal Context / Special Instructions (Optional)
+                      </label>
+                      <button
+                        type="button"
+                        onClick={handleRegenerateAppeal}
+                        disabled={draftingAppeal}
+                        className="inline-flex items-center gap-1 text-2xs font-semibold text-blue-600 hover:text-blue-800 transition-colors"
+                      >
+                        <RefreshCw className="w-3 h-3" />
+                        Regenerate Draft
+                      </button>
+                    </div>
+                    <textarea
+                      value={appealContext}
+                      onChange={(e) => setAppealContext(e.target.value)}
+                      rows={2}
+                      className="input text-xs"
+                      placeholder="e.g. Include physician peer-to-peer notes, mention prior authorization reference #..."
+                    />
+                  </div>
+
+                  {/* Letter Content Preview */}
+                  <div className="relative bg-slate-900 text-slate-100 rounded-xl p-5 font-mono text-xs leading-relaxed max-h-[360px] overflow-y-auto border border-slate-800 shadow-inner">
+                    <div className="flex items-center justify-between pb-3 mb-3 border-b border-slate-800 text-2xs text-slate-400">
+                      <span className="flex items-center gap-1.5 text-blue-400 font-semibold">
+                        <Sparkles className="w-3 h-3" />
+                        Generated by AI Appeal Specialist
+                      </span>
+                      <span>{appealDraft.length} characters</span>
+                    </div>
+                    <pre className="whitespace-pre-wrap font-sans text-slate-200 text-xs leading-relaxed">
+                      {appealDraft || 'No appeal letter text available.'}
+                    </pre>
+                  </div>
+                </>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 border-t border-slate-200 bg-slate-50/70 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={closeAppealModal}
+                className="btn-secondary text-xs"
+              >
+                Close
+              </button>
+
+              {!draftingAppeal && appealDraft && (
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-semibold transition-all ${
+                      copied
+                        ? 'bg-emerald-600 text-white shadow-sm'
+                        : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm shadow-blue-500/20'
+                    }`}
+                  >
+                    {copied ? (
+                      <>
+                        <Check className="w-4 h-4" />
+                        Copied to Clipboard!
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-4 h-4" />
+                        Copy Appeal Letter
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
             </div>
           </div>
-        )}
-      </div>);
+        </div>
+      )}
+    </div>
+  );
 }

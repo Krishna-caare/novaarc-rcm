@@ -10,25 +10,68 @@ import {
   DenialCodeRow,
 } from '../components/DashboardComponents';
 import {
-  DollarSign, CreditCard, FileText, TrendingUp, AlertTriangle, Download, RefreshCw
+  DollarSign, CreditCard, FileText, TrendingUp, AlertTriangle,
+  Download, RefreshCw, Activity,
 } from 'lucide-react';
 import { cn, formatCurrency, formatPercent, formatNumber } from '../lib/utils';
-import { DashboardRevenueHealth, DashboardARHealth, DashboardPayerPerformance, DenialIntelligence, ClaimsSummary } from '../types';
+import {
+  DashboardRevenueHealth, DashboardARHealth,
+  DashboardPayerPerformance, DenialIntelligence, ClaimsSummary,
+} from '../types';
 
+type Tab = 'revenue' | 'ar' | 'denials' | 'payers';
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'revenue', label: 'Revenue Health'      },
+  { id: 'ar',      label: 'AR Health'           },
+  { id: 'denials', label: 'Denial Intelligence' },
+  { id: 'payers',  label: 'Payer Performance'   },
+];
+
+// ── Skeleton Loaders ──────────────────────────────────────────────────────────
+function MetricSkeleton() {
+  return (
+    <div className="card p-5 space-y-3">
+      <div className="flex items-start justify-between">
+        <div className="space-y-2 flex-1">
+          <div className="skeleton-text w-24" />
+          <div className="skeleton h-8 rounded w-32" />
+          <div className="skeleton-text w-20" />
+        </div>
+        <div className="skeleton w-12 h-12 rounded-xl" />
+      </div>
+    </div>
+  );
+}
+
+function TableSkeleton({ rows = 5 }) {
+  return (
+    <div className="space-y-0">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} className="flex items-center gap-4 px-4 py-3 border-b border-slate-100">
+          <div className="skeleton-text flex-1" />
+          <div className="skeleton-text w-24" />
+          <div className="skeleton-text w-16" />
+          <div className="skeleton-text w-20" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Main Dashboard Page ───────────────────────────────────────────────────────
 export function DashboardPage() {
-  const {  } = useAuth();
+  const { user } = useAuth();
   const [revenueHealth, setRevenueHealth] = useState<DashboardRevenueHealth | null>(null);
   const [arHealth, setArHealth] = useState<DashboardARHealth | null>(null);
   const [payerPerformance, setPayerPerformance] = useState<DashboardPayerPerformance[]>([]);
   const [denialIntelligence, setDenialIntelligence] = useState<DenialIntelligence | null>(null);
   const [claimsSummary, setClaimsSummary] = useState<ClaimsSummary | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'revenue' | 'ar' | 'denials' | 'payers'>('revenue');
+  const [activeTab, setActiveTab] = useState<Tab>('revenue');
   const [error, setError] = useState<string | null>(null);
+  const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
 
-  useEffect(() => {
-    fetchData();
-  }, []);
+  useEffect(() => { fetchData(); }, []);
 
   const fetchData = async () => {
     setLoading(true);
@@ -46,6 +89,7 @@ export function DashboardPage() {
       setPayerPerformance(payers);
       setDenialIntelligence(denials);
       setClaimsSummary(claims);
+      setLastRefreshed(new Date());
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load dashboard data');
     } finally {
@@ -53,168 +97,182 @@ export function DashboardPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-12 w-12 border-4 border-primary-600 border-t-transparent" />
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="text-center py-12">
-        <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <p className="text-red-600">{error}</p>
-        <button onClick={fetchData} className="mt-4 btn-primary">Retry</button>
-      </div>
-    );
-  }
-
-  const totalClaims = claimsSummary?.total_claims || 0;
+  const totalClaims    = claimsSummary?.total_claims || 0;
   const statusBreakdown = claimsSummary?.by_status || [];
 
-  return (
-          <div className="space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Dashboard</h1>
-            <p className="text-slate-600">Revenue cycle management overview</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button onClick={fetchData} className="btn-secondary" disabled={loading}>
-              <RefreshCw className={cn('w-4 h-4 mr-2', loading && 'animate-spin')} />
-              Refresh
-            </button>
-            <button className="btn-secondary">
-              <Download className="w-4 h-4 mr-2" />
-              Export
-            </button>
-          </div>
-        </div>
+  const greeting = (() => {
+    const h = new Date().getHours();
+    if (h < 12) return 'Good morning';
+    if (h < 17) return 'Good afternoon';
+    return 'Good evening';
+  })();
 
+  return (
+    <div className="space-y-6">
+      {/* ── Page Header ─────────────────────────────────────────────── */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
+        <div>
+          <h1 className="page-title">
+            {greeting}{user?.name ? `, ${user.name.split(' ')[0]}` : ''} 👋
+          </h1>
+          <p className="page-subtitle mt-1">
+            Revenue cycle overview · Last updated {lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={fetchData}
+            disabled={loading}
+            className="btn-secondary"
+          >
+            <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
+            Refresh
+          </button>
+          <button className="btn-secondary">
+            <Download className="w-4 h-4" />
+            Export
+          </button>
+        </div>
+      </div>
+
+      {/* ── Error State ─────────────────────────────────────────────── */}
+      {error && (
+        <div className="flex items-center gap-3 bg-crimson-50 border border-crimson-200 text-crimson-700 px-5 py-4 rounded-xl">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <div className="flex-1">
+            <p className="font-medium">Failed to load dashboard</p>
+            <p className="text-sm text-crimson-600">{error}</p>
+          </div>
+          <button onClick={fetchData} className="btn-danger btn-sm">Retry</button>
+        </div>
+      )}
+
+      {/* ── Metric Cards ─────────────────────────────────────────────── */}
+      {loading ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {[1,2,3,4].map(i => <MetricSkeleton key={i} />)}
+        </div>
+      ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <MetricCard
             title="Outstanding AR"
             value={formatCurrency(revenueHealth?.ar_outstanding || 0)}
             change={-2.3}
             changeLabel="vs last month"
-            icon={<DollarSign className="w-6 h-6" />}
-            iconColor="bg-blue-100 text-blue-600"
+            icon={<DollarSign className="w-5 h-5" />}
+            iconBg="bg-blue-100 text-blue-600"
             trend="down"
+            accent="blue"
           />
           <MetricCard
             title="Collected (MTD)"
             value={formatCurrency(revenueHealth?.collected || 0)}
             change={5.1}
             changeLabel="vs last month"
-            icon={<CreditCard className="w-6 h-6" />}
-            iconColor="bg-green-100 text-green-600"
+            icon={<CreditCard className="w-5 h-5" />}
+            iconBg="bg-forest-100 text-forest-600"
             trend="up"
+            accent="green"
           />
           <MetricCard
             title="Collection Rate"
             value={formatPercent(revenueHealth?.collection_rate || 0)}
             change={1.2}
             changeLabel="vs last month"
-            icon={<TrendingUp className="w-6 h-6" />}
-            iconColor="bg-purple-100 text-purple-600"
+            icon={<TrendingUp className="w-5 h-5" />}
+            iconBg="bg-violet-100 text-violet-600"
             trend="up"
+            accent="purple"
           />
           <MetricCard
             title="Total Claims"
             value={formatNumber(totalClaims)}
             change={3.5}
             changeLabel="vs last month"
-            icon={<FileText className="w-6 h-6" />}
-            iconColor="bg-orange-100 text-orange-600"
+            icon={<FileText className="w-5 h-5" />}
+            iconBg="bg-amber-100 text-amber-600"
             trend="up"
+            accent="amber"
           />
         </div>
+      )}
 
-        <div className="border-b border-slate-200">
-          <nav className="flex gap-1 px-1" aria-label="Dashboard tabs">
-            <button
-              onClick={() => setActiveTab('revenue')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-                activeTab === 'revenue'
-                  ? 'bg-white text-primary-600 border-b-2 border-primary-600'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              )}
-            >
-              Revenue Health
-            </button>
-            <button
-              onClick={() => setActiveTab('ar')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-                activeTab === 'ar'
-                  ? 'bg-white text-primary-600 border-b-2 border-primary-600'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              )}
-            >
-              AR Health
-            </button>
-            <button
-              onClick={() => setActiveTab('denials')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-                activeTab === 'denials'
-                  ? 'bg-white text-primary-600 border-b-2 border-primary-600'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              )}
-            >
-              Denial Intelligence
-            </button>
-            <button
-              onClick={() => setActiveTab('payers')}
-              className={cn(
-                'px-4 py-2 text-sm font-medium rounded-t-lg transition-colors',
-                activeTab === 'payers'
-                  ? 'bg-white text-primary-600 border-b-2 border-primary-600'
-                  : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
-              )}
-            >
-              Payer Performance
-            </button>
+      {/* ── Tabs ─────────────────────────────────────────────────────── */}
+      <div className="bg-white rounded-xl shadow-card border border-slate-200 overflow-hidden">
+        {/* Tab bar */}
+        <div className="border-b border-slate-200 px-4">
+          <nav className="flex gap-0 -mb-px" aria-label="Dashboard tabs">
+            {TABS.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={cn(
+                  'px-4 py-3.5 text-sm font-medium border-b-2 transition-all duration-150 whitespace-nowrap',
+                  activeTab === tab.id
+                    ? 'border-primary-700 text-primary-700 bg-primary-50/30'
+                    : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300',
+                )}
+              >
+                {tab.label}
+              </button>
+            ))}
           </nav>
         </div>
 
-        {activeTab === 'revenue' && revenueHealth && (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle>AR Aging Buckets</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-6">
+        {/* Tab content */}
+        <div className="p-6 animate-fade-in">
+          {loading && <TableSkeleton rows={6} />}
+
+          {/* Revenue Health Tab */}
+          {!loading && activeTab === 'revenue' && revenueHealth && (
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* AR Aging Buckets */}
+              <div className="lg:col-span-2 space-y-2">
+                <div className="flex items-center gap-2 mb-5">
+                  <Activity className="w-4 h-4 text-primary-600" />
+                  <h3 className="font-semibold text-slate-800 text-sm">AR Aging Buckets</h3>
+                </div>
+                <div className="space-y-5">
                   {Object.entries(revenueHealth.aging_buckets).map(([label, value]) => {
                     const total = revenueHealth.ar_outstanding || 1;
-                    const percentage = (value / total) * 100;
-                    let color = '#22c55e';
-                    if (label.includes('30-60') || label.includes('60+')) color = '#f59e0b';
-                    if (label.includes('90') || label.includes('120')) color = '#ef4444';
+                    const pct   = (value / total) * 100;
+                    let color   = '#059669';
+                    if (label.includes('30-60') || label.includes('60+'))    color = '#D97706';
+                    if (label.includes('90') || label.includes('120'))       color = '#DC2626';
                     return (
                       <AgingBucket
                         key={label}
                         label={label}
                         value={value}
-                        percentage={percentage}
+                        percentage={pct}
                         color={color}
                       />
                     );
                   })}
                 </div>
-              </CardContent>
-            </Card>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Claims by Status</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
+                {/* KPI row */}
+                <div className="mt-6 grid grid-cols-3 gap-4 pt-5 border-t border-slate-100">
+                  {[
+                    { label: 'Gross Charges',    value: formatCurrency(revenueHealth.gross_charges || 0) },
+                    { label: 'Adjustments',      value: formatCurrency(revenueHealth.adjustments   || 0) },
+                    { label: 'Net Collections',  value: formatCurrency(revenueHealth.collected      || 0) },
+                  ].map(kpi => (
+                    <div key={kpi.label} className="text-center">
+                      <p className="text-lg font-bold text-slate-900">{kpi.value}</p>
+                      <p className="text-xs text-slate-500 mt-0.5">{kpi.label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Claims by Status */}
+              <div>
+                <div className="flex items-center gap-2 mb-4">
+                  <FileText className="w-4 h-4 text-primary-600" />
+                  <h3 className="font-semibold text-slate-800 text-sm">Claims by Status</h3>
+                </div>
+                <div className="space-y-1">
                   {statusBreakdown.map((s) => (
                     <StatusBadge
                       key={s.status}
@@ -224,90 +282,83 @@ export function DashboardPage() {
                     />
                   ))}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                <div className="mt-4 pt-4 border-t border-slate-100 text-center">
+                  <p className="text-2xl font-bold text-slate-900">{formatNumber(totalClaims)}</p>
+                  <p className="text-xs text-slate-500">Total Claims</p>
+                </div>
+              </div>
+            </div>
+          )}
 
-        {activeTab === 'ar' && arHealth && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>AR by Payer</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+          {/* AR Health Tab */}
+          {!loading && activeTab === 'ar' && arHealth && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-semibold text-slate-800 text-sm mb-4">AR by Payer</h3>
+                <div className="table-container">
+                  <table className="table">
                     <thead>
-                      <tr className="text-left text-sm text-slate-500 border-b border-slate-200">
-                        <th className="px-4 py-3">Payer</th>
-                        <th className="px-4 py-3">AR Outstanding</th>
-                        <th className="px-4 py-3">Claims</th>
-                        <th className="px-4 py-3">Avg Days</th>
+                      <tr>
+                        <th>Payer</th>
+                        <th>AR Outstanding</th>
+                        <th>Claims</th>
+                        <th>Avg Days</th>
                       </tr>
                     </thead>
                     <tbody>
                       {arHealth.by_payer.map((p) => (
-                        <tr key={p.payer_id} className="hover:bg-slate-50 border-b border-slate-100">
-                          <td className="px-4 py-3 font-medium text-slate-900">{p.payer_name}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatCurrency(p.ar_outstanding)}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatNumber(p.claim_count)}</td>
-                          <td className="px-4 py-3 text-slate-600">{p.avg_days_outstanding.toFixed(1)}</td>
+                        <tr key={p.payer_id}>
+                          <td className="font-medium text-slate-900">{p.payer_name}</td>
+                          <td className="font-mono text-sm">{formatCurrency(p.ar_outstanding)}</td>
+                          <td>{formatNumber(p.claim_count)}</td>
+                          <td>{p.avg_days_outstanding.toFixed(1)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle>AR by Specialty</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+              </div>
+              <div>
+                <h3 className="font-semibold text-slate-800 text-sm mb-4">AR by Specialty</h3>
+                <div className="table-container">
+                  <table className="table">
                     <thead>
-                      <tr className="text-left text-sm text-slate-500 border-b border-slate-200">
-                        <th className="px-4 py-3">Specialty</th>
-                        <th className="px-4 py-3">AR Outstanding</th>
-                        <th className="px-4 py-3">Claims</th>
-                        <th className="px-4 py-3">Avg Days</th>
+                      <tr>
+                        <th>Specialty</th>
+                        <th>AR Outstanding</th>
+                        <th>Claims</th>
+                        <th>Avg Days</th>
                       </tr>
                     </thead>
                     <tbody>
                       {arHealth.by_specialty.map((s) => (
-                        <tr key={s.specialty} className="hover:bg-slate-50 border-b border-slate-100">
-                          <td className="px-4 py-3 font-medium text-slate-900">{s.specialty}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatCurrency(s.ar_outstanding)}</td>
-                          <td className="px-4 py-3 text-slate-600">{formatNumber(s.claim_count)}</td>
-                          <td className="px-4 py-3 text-slate-600">{s.avg_days_outstanding.toFixed(1)}</td>
+                        <tr key={s.specialty}>
+                          <td className="font-medium text-slate-900">{s.specialty}</td>
+                          <td className="font-mono text-sm">{formatCurrency(s.ar_outstanding)}</td>
+                          <td>{formatNumber(s.claim_count)}</td>
+                          <td>{s.avg_days_outstanding.toFixed(1)}</td>
                         </tr>
                       ))}
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              </div>
+            </div>
+          )}
 
-        {activeTab === 'denials' && denialIntelligence && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Top Denial Codes</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
+          {/* Denial Intelligence Tab */}
+          {!loading && activeTab === 'denials' && denialIntelligence && (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <h3 className="font-semibold text-slate-800 text-sm mb-4">Top Denial Codes</h3>
+                <div className="table-container">
+                  <table className="table">
                     <thead>
-                      <tr className="text-left text-sm text-slate-500 border-b border-slate-200">
-                        <th className="px-4 py-3">Code</th>
-                        <th className="px-4 py-3">Count</th>
-                        <th className="px-4 py-3">Total Denied</th>
-                        <th className="px-4 py-3">Avg Denied</th>
+                      <tr>
+                        <th>Code</th>
+                        <th>Count</th>
+                        <th>Total Denied</th>
+                        <th>Avg Denied</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -317,51 +368,52 @@ export function DashboardPage() {
                     </tbody>
                   </table>
                 </div>
-              </CardContent>
-            </Card>
+              </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Denials by Root Cause</CardTitle>
-              </CardHeader>
-              <CardContent>
+              <div>
+                <h3 className="font-semibold text-slate-800 text-sm mb-4">Denials by Root Cause</h3>
                 <div className="space-y-4">
-                  {denialIntelligence.by_root_cause.map((r) => (
-                    <div key={r.root_cause} className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <p className="font-medium text-slate-900">{r.root_cause}</p>
-                        <p className="text-sm text-slate-500">{formatNumber(r.count)} denials • {formatCurrency(r.total_denied)}</p>
+                  {denialIntelligence.by_root_cause.map((r) => {
+                    const pct = Math.min(
+                      (r.count / (denialIntelligence.by_root_cause[0]?.count || 1)) * 100,
+                      100,
+                    );
+                    return (
+                      <div key={r.root_cause}>
+                        <div className="flex items-center justify-between text-sm mb-1.5">
+                          <span className="font-medium text-slate-800">{r.root_cause}</span>
+                          <span className="text-slate-500">
+                            {formatNumber(r.count)} · {formatCurrency(r.total_denied)}
+                          </span>
+                        </div>
+                        <div className="progress-bar">
+                          <div
+                            className="progress-fill bg-crimson-400"
+                            style={{ width: `${pct}%` }}
+                          />
+                        </div>
                       </div>
-                      <div className="w-32 h-2 bg-slate-200 rounded-full overflow-hidden ml-4">
-                        <div
-                          className="h-full bg-red-500 rounded-full"
-                          style={{ width: `${Math.min((r.count / (denialIntelligence.by_root_cause[0]?.count || 1)) * 100, 100)}%` }}
-                        />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+              </div>
+            </div>
+          )}
 
-        {activeTab === 'payers' && (
-          <Card>
-            <CardHeader>
-              <CardTitle>Payer Performance</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="overflow-x-auto">
-                <table className="w-full">
+          {/* Payer Performance Tab */}
+          {!loading && activeTab === 'payers' && (
+            <div>
+              <h3 className="font-semibold text-slate-800 text-sm mb-4">Payer Performance Overview</h3>
+              <div className="table-container">
+                <table className="table">
                   <thead>
-                    <tr className="text-left text-sm text-slate-500 border-b border-slate-200">
-                      <th className="px-4 py-3">Payer</th>
-                      <th className="px-4 py-3">Charged</th>
-                      <th className="px-4 py-3">Paid</th>
-                      <th className="px-4 py-3">Collection Rate</th>
-                      <th className="px-4 py-3">Denial Rate</th>
-                      <th className="px-4 py-3">Avg Days to Pay</th>
+                    <tr>
+                      <th>Payer</th>
+                      <th>Charged</th>
+                      <th>Paid</th>
+                      <th>Collection Rate</th>
+                      <th>Denial Rate</th>
+                      <th>Avg Days to Pay</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -371,8 +423,10 @@ export function DashboardPage() {
                   </tbody>
                 </table>
               </div>
-            </CardContent>
-          </Card>
-        )}
-      </div>);
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

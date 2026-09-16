@@ -155,7 +155,7 @@ export function WorkQueuesPage() {
                       <div className="overflow-x-auto">
                         <table className="w-full">
                           <thead>
-                            <tr className="bg-slate-50 text-left text-sm text-slate-500 border-b border-slate-200">
+                            <tr className="bg-slate-50 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider border-b border-slate-200">
                               <th className="px-4 py-3">Claim</th>
                               <th className="px-4 py-3">Patient</th>
                               <th className="px-4 py-3">Provider</th>
@@ -166,9 +166,9 @@ export function WorkQueuesPage() {
                               <th className="px-4 py-3">Actions</th>
                             </tr>
                           </thead>
-                          <tbody>
+                          <tbody className="divide-y divide-slate-100 text-sm">
                             {queueClaims.map((claim) => (
-                              <tr key={claim.claim_id} className="hover:bg-slate-50 border-b border-slate-100">
+                              <tr key={claim.claim_id} className="hover:bg-slate-50/80 transition-colors">
                                 <td className="px-4 py-3 font-mono text-sm text-slate-900">CLM-{claim.claim_id}</td>
                                 <td className="px-4 py-3 text-slate-600">{claim.patient?.mrn || 'N/A'}</td>
                                 <td className="px-4 py-3 text-slate-600">{claim.provider?.name || 'N/A'}</td>

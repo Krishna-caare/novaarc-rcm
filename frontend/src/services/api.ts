@@ -9,7 +9,9 @@ declare global {
   }
 }
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+// In dev: VITE_API_URL is empty → axios uses relative URLs → Vite proxy forwards to Render
+// In prod (Netlify): VITE_API_URL=https://novaarc-backend.onrender.com is set in env vars
+const API_BASE_URL = import.meta.env.VITE_API_URL || '';
 
 class ApiClient {
   private client: AxiosInstance;
