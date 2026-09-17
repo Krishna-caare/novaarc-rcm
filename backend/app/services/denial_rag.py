@@ -1,10 +1,11 @@
 import os
 import json
 import httpx
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from decimal import Decimal
 
 from app.knowledge_graph.graph_engine import denial_kg
+from app.services.vector_engine import denial_vector_engine
 try:
     from app.core.config import settings
 except Exception:
@@ -57,54 +58,70 @@ def parse_json_safely(text: str) -> dict:
     return json.loads(text)
 
 
-def match_best_scenario(scenarios: List[Dict[str, Any]], claim_context: Dict[str, Any]) -> Dict[str, Any]:
-    """Matches the most specific scenario from candidate scenarios based on claim clinical indicators"""
+def match_best_scenario(scenarios: List[Dict[str, Any]], claim_context: Dict[str, Any]) -> Tuple[Dict[str, Any], float, str]:
+    """
+    Hybrid Vector + Clinical Heuristic Scenario Matching:
+    1. Runs semantic vector cosine similarity across scenario vector space.
+    2. Blends semantic similarity with hard healthcare rules (CPT surgery vs E/M ranges).
+    3. Returns (best_scenario, confidence_score, vector_model).
+    """
     if not scenarios:
-        return {}
+        return {}, 0.50, denial_vector_engine.encoder_type
 
     if len(scenarios) == 1:
-        return scenarios[0]
+        return scenarios[0], 0.95, denial_vector_engine.encoder_type
+
+    # 1. Run Dense Semantic Vector Search
+    query_parts = [
+        str(claim_context.get("root_cause", "")),
+        str(claim_context.get("description", "")),
+        str(claim_context.get("clinical_notes", "")),
+        " ".join(str(c) for c in claim_context.get("cpt_codes", []))
+    ]
+    query_text = " ".join(p for p in query_parts if p.strip())
+
+    denial_code = claim_context.get("denial_code", "")
+    vector_hits = denial_vector_engine.search(query_text, carc_filter=denial_code, top_k=5)
+    vector_scores = {h["scenario_id"]: h["similarity"] for h in vector_hits}
 
     cpts = [str(c).upper() for c in claim_context.get("cpt_codes", [])]
     root_cause = str(claim_context.get("root_cause", "")).lower()
     description = str(claim_context.get("description", "")).lower()
-    notes = str(claim_context.get("clinical_notes", "")).lower()
 
     # Determine clinical nature of procedures
     has_em = any(c.startswith("992") or c.startswith("993") or c.startswith("994") for c in cpts)
     has_surgery = any(c.startswith(("1", "2", "3", "4", "5", "6")) and len(c) == 5 for c in cpts)
-    has_radiology = any(c.startswith("7") and len(c) == 5 for c in cpts)
-    has_lab = any(c.startswith("8") and len(c) == 5 for c in cpts)
     has_dme = any(c.startswith(("A", "E", "L", "K")) for c in cpts)
 
     scored = []
     for sc in scenarios:
-        score = 0
-        sc_id = str(sc.get('id', '')).lower()
+        sc_id = str(sc.get('id', ''))
+        v_sim = vector_scores.get(sc_id, 0.05)
+
+        # Baseline score seeded by semantic vector similarity (scaled 0-50 points)
+        score = v_sim * 50.0
+
+        sc_id_lower = sc_id.lower()
         sc_title = str(sc.get('title', '')).lower()
-        sc_text = f"{sc_id} {sc_title} {sc.get('root_cause', '')}".lower()
+        sc_text = f"{sc_id_lower} {sc_title} {sc.get('root_cause', '')}".lower()
 
-        # Keyword match against root cause / description
-        if root_cause and any(word in sc_text for word in root_cause.split() if len(word) > 3):
-            score += 15
-
-        # Modifier 25 / E&M matching
-        if "mod-25" in sc_id or "modifier 25" in sc_title or "modifier" in sc_text:
+        # Modifier 25 / E&M clinical constraint
+        if "mod-25" in sc_id_lower or "modifier 25" in sc_title or "modifier" in sc_text:
             if "modifier" in description or "modifier" in root_cause:
                 score += 25
             elif has_em:
-                score += 12 # Office visits favor modifier 25 when modifier absent
+                score += 15
 
-        # Surgery / Operative note matching
-        if "op-note" in sc_id or "operative" in sc_text or "surgical" in sc_text:
+        # Surgery / Operative note clinical constraint
+        if "op-note" in sc_id_lower or "operative" in sc_text or "surgical" in sc_text:
             if "operative" in description or "operative" in root_cause or "op note" in description:
                 score += 25
             elif has_surgery:
-                score += 15
+                score += 18
             else:
-                score -= 12 # Strongly penalize operative notes if NO surgical procedure on claim
+                score -= 15 # Penalize operative notes if NO surgical procedure on claim
 
-        # General chart notes / progress note
+        # General chart notes / progress notes
         if "chart" in sc_text or "progress note" in sc_text or "medical record" in sc_text:
             if "medical record" in description or "records" in root_cause:
                 score += 20
@@ -124,29 +141,35 @@ def match_best_scenario(scenarios: List[Dict[str, Any]], claim_context: Dict[str
             if "retro" in root_cause:
                 score += 20
 
-        # Timely filing proof
-        if "proof" in sc_text or "available" in sc_text:
-            if claim_context.get("initial_submission_date") or "submitted timely" in root_cause:
-                score += 15
+        # Timely filing proof vs write-off
+        if "no-proof" in sc_id_lower or "write-off" in sc_text:
+            if claim_context.get("initial_submission_date") or "submitted timely" in root_cause or "proof" in root_cause:
+                score -= 25 # Strong penalty against write-off if initial submission date or proof is recorded
+        elif "proof" in sc_id_lower or "available" in sc_text or "timely" in sc_id_lower:
+            if claim_context.get("initial_submission_date") or "submitted timely" in root_cause or "proof" in root_cause:
+                score += 35 # Strong boost for proof scenario when submission proof exists
 
         # COB Patient update
         if "patient" in sc_text and "update" in sc_text:
             if "patient" in description or "member" in description or "update" in root_cause:
                 score += 15
 
-        scored.append((score, sc))
+        scored.append((score, v_sim, sc))
 
     scored.sort(key=lambda x: x[0], reverse=True)
-    return scored[0][1]
+    best = scored[0]
+    # Compute normalized confidence (0.80 to 0.99)
+    confidence = round(min(0.99, max(0.80, 0.75 + best[1] * 0.5)), 3)
+    return best[2], confidence, denial_vector_engine.encoder_type
 
 
 async def run_denial_rag(claim_context: Dict[str, Any]) -> Dict[str, Any]:
     """
     Executes the Hybrid GraphRAG pipeline:
     1. Traverses the Knowledge Graph for the denial code.
-    2. Selects the most accurate scenario subgraph.
+    2. Semantically matches the optimal scenario via Dense Vector + Clinical Rules.
     3. Prompts specialized clinical LLM (or deterministic fallback) with combined context.
-    4. Formats and returns resolution playbook and standard AR call notes.
+    4. Formats and returns resolution playbook, vector confidence, and standard AR call notes.
     """
     denial_code = claim_context.get("denial_code", "CO-16").upper().strip()
     subgraph = denial_kg.get_subgraph(denial_code)
@@ -155,7 +178,7 @@ async def run_denial_rag(claim_context: Dict[str, Any]) -> Dict[str, Any]:
         # Fallback to general missing info if code unknown
         subgraph = denial_kg.get_subgraph("CO-16")
 
-    selected_scenario = match_best_scenario(subgraph.scenarios, claim_context)
+    selected_scenario, confidence, vector_model = match_best_scenario(subgraph.scenarios, claim_context)
 
     # Pre-populate template variables for AR Notes
     claim_id = claim_context.get("claim_id", "N/A")
@@ -204,6 +227,9 @@ async def run_denial_rag(claim_context: Dict[str, Any]) -> Dict[str, Any]:
                             content = data["choices"][0]["message"]["content"]
                             llm_result = parse_json_safely(content)
                             if isinstance(llm_result, dict) and "resolution_action_plan" in llm_result:
+                                llm_result["confidence"] = confidence
+                                llm_result["vector_model"] = vector_model
+                                llm_result["retrieval_method"] = "hybrid_graph_vector"
                                 return llm_result
                 except Exception:
                     continue
@@ -220,6 +246,8 @@ async def run_denial_rag(claim_context: Dict[str, Any]) -> Dict[str, Any]:
         "form_requirements": selected_scenario.get("form_requirements", {}),
         "resolution_action_plan": selected_scenario.get("action_plan", []),
         "standard_ar_notes": std_notes,
-        "confidence": 0.95,
+        "confidence": confidence,
+        "vector_model": vector_model,
+        "retrieval_method": "hybrid_graph_vector",
         "source": "knowledge_graph_deterministic"
     }

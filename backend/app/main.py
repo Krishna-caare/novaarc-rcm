@@ -6,7 +6,7 @@ from app.core.config import settings
 from app.core.database import init_db
 from app.routers import (
     auth, claims, denials, payments, dashboard,
-    work_queues, agents, assistant
+    work_queues, agents, assistant, knowledge_graph
 )
 
 
@@ -58,6 +58,7 @@ app.include_router(dashboard.router, prefix="/dashboard", tags=["Dashboard"])
 app.include_router(work_queues.router, prefix="/work-queues", tags=["Work Queues"])
 app.include_router(agents.router, prefix="/agents", tags=["Agents"])
 app.include_router(assistant.router, prefix="/assistant", tags=["AI Assistant"])
+app.include_router(knowledge_graph.router, prefix="/knowledge-graph", tags=["Knowledge Graph & Vector RAG"])
 
 from fastapi import Request
 from fastapi.responses import JSONResponse
