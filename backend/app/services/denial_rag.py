@@ -106,23 +106,25 @@ def match_best_scenario(scenarios: List[Dict[str, Any]], claim_context: Dict[str
         sc_text = f"{sc_id_lower} {sc_title} {sc.get('root_cause', '')}".lower()
 
         # Modifier 25 / E&M clinical constraint
-        if "mod-25" in sc_id_lower or "modifier 25" in sc_title or "modifier" in sc_text:
+        if "mod-25" in sc_id_lower or "modifier 25" in sc_title:
             if "modifier" in description or "modifier" in root_cause:
                 score += 25
             elif has_em:
                 score += 15
+            else:
+                score -= 20  # Cannot be modifier 25 without an E/M service or modifier mention
 
         # Surgery / Operative note clinical constraint
-        if "op-note" in sc_id_lower or "operative" in sc_text or "surgical" in sc_text:
-            if "operative" in description or "operative" in root_cause or "op note" in description:
+        if "op-note" in sc_id_lower or "operative" in sc_id_lower or "operative" in sc_title:
+            if "operative" in description or "operative" in root_cause or "op note" in description or "records" in root_cause:
                 score += 25
             elif has_surgery:
-                score += 18
+                score += 20
             else:
                 score -= 15 # Penalize operative notes if NO surgical procedure on claim
 
         # General chart notes / progress notes
-        if "chart" in sc_text or "progress note" in sc_text or "medical record" in sc_text:
+        if "chart" in sc_title or "progress note" in sc_title or "medical record" in sc_title:
             if "medical record" in description or "records" in root_cause:
                 score += 20
             elif has_em:

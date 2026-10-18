@@ -13,6 +13,20 @@ from app.routers import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    try:
+        from app.core.database import AsyncSessionLocal
+        from app.models import User
+        from sqlalchemy import select, func
+        async with AsyncSessionLocal() as session:
+            result = await session.execute(select(func.count(User.user_id)))
+            user_count = result.scalar() or 0
+            if user_count == 0:
+                print("Database is empty. Running initial demo seed...")
+                from scripts.seed import main as seed_main
+                await seed_main()
+                print("Initial seed completed successfully!")
+    except Exception as e:
+        print(f"Auto-seed check/execution notice: {e}")
     yield
 
 
