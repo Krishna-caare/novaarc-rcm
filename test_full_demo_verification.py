@@ -9,7 +9,9 @@ from reportlab.pdfgen import canvas
 # Ensure UTF-8 output
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='replace')
 
-BASE_URL = "https://novaarc-backend.onrender.com"
+import os
+
+BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
 FRONTEND_NETLIFY = "https://novaarc-rcm-app.netlify.app"
 FRONTEND_GH_PAGES = "https://krishna-caare.github.io/novaarc-rcm/"
 

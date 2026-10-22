@@ -175,10 +175,15 @@ async def denial_intelligence(
         .limit(15)
     )
 
-    # Postgres: to_char for month, instead of strftime
+    # Support both SQLite (strftime) and PostgreSQL (to_char)
+    if db.bind and db.bind.dialect.name == "sqlite":
+        month_expr = func.strftime("%Y-%m", Denial.denial_date).label("month")
+    else:
+        month_expr = func.to_char(Denial.denial_date, 'YYYY-MM').label("month")
+
     denial_trend = await db.execute(
         select(
-            func.to_char(Denial.denial_date, 'YYYY-MM').label("month"),
+            month_expr,
             func.count(Denial.denial_id).label("count"),
             func.sum(Denial.denied_amount).label("total_denied")
         )

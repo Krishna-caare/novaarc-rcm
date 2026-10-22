@@ -13,7 +13,7 @@ declare global {
 // In prod (Netlify / GitHub Pages): fallback to Render backend URL if VITE_API_URL is not set
 const API_BASE_URL =
   import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? '' : 'https://novaarc-backend.onrender.com');
+  (import.meta.env.DEV ? '' : 'https://novaarc-backend-i4qm.onrender.com');
 
 class ApiClient {
   private client: AxiosInstance;

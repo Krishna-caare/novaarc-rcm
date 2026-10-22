@@ -9,7 +9,7 @@ const base = process.env.VITE_BASE_PATH || '/'
 
 // During local dev, proxy API calls to the Render backend to avoid CORS issues.
 // The VITE_API_URL in .env points to the real Render URL for production builds.
-const BACKEND_URL = 'https://novaarc-backend.onrender.com'
+const BACKEND_URL = process.env.VITE_BACKEND_URL || 'https://novaarc-backend-i4qm.onrender.com'
 
 export default defineConfig({
   base,

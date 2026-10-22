@@ -37,12 +37,13 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# Build allowed origins: always include localhost, Netlify domains, GitHub Pages, plus FRONTEND_URL
+# Build allowed origins: always include localhost, Netlify domains, GitHub Pages, Render, plus FRONTEND_URL
 _allowed_origins = [
     "http://localhost:5173",
     "http://localhost:5174",
     "http://localhost:3000",
     "https://novaarc.netlify.app",
+    "https://novaarc-frontend.onrender.com",
     "https://majestic-seahorse-c3e878.netlify.app",
     "https://krishna-caare.github.io",
 ]
@@ -58,7 +59,7 @@ if _frontend_url:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_allowed_origins,
-    allow_origin_regex=r"https://.*(\.netlify\.app|\.github\.io)",
+    allow_origin_regex=r"https://.*(\.netlify\.app|\.github\.io|\.onrender\.com)",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
