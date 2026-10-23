@@ -5,14 +5,15 @@
     <title>NovaArc RCM</title>
     <script>
       // GitHub Pages SPA redirect trick
-      // Redirects /novaarc-rcm/dashboard → /novaarc-rcm/?/dashboard
-      // which index.html then picks up and restores via sessionStorage
+      // Redirects /novaarc-rcm/claims → /novaarc-rcm/?/claims
+      // which index.html then picks up and restores via history.replaceState
       var pathSegmentsToKeep = 1; // 1 = keep /novaarc-rcm/ prefix
       var l = window.location;
+      var cleanSubPath = l.pathname.slice(1).split('/').slice(pathSegmentsToKeep).join('/');
       l.replace(
         l.protocol + '//' + l.hostname + (l.port ? ':' + l.port : '') +
         l.pathname.split('/').slice(0, 1 + pathSegmentsToKeep).join('/') +
-        '/?/' + l.pathname.slice(1 + pathSegmentsToKeep).replace(/&/g, '~and~') +
+        '/?/' + cleanSubPath.replace(/&/g, '~and~') +
         (l.search ? '&' + l.search.slice(1).replace(/&/g, '~and~') : '') +
         l.hash
       );

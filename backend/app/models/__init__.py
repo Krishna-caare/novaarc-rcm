@@ -30,7 +30,33 @@ class ClaimStatus(str, enum.Enum):
     refunds_overpayments_refund_dispute = "refunds_overpayments_refund_dispute"
 
 
+OPEN_AR_STATUSES = [
+    "submitted",
+    "acknowledged",
+    "in_process",
+    "denied",
+    "appealed",
+    "claim_resubmission_call_ivr",
+    "claim_resubmission_review_portal",
+    "appeals_standard_claim_appeal_review_written",
+    "appeals_complex_peer_to_peer_appeal_call_conference",
+    "status_inquiry_claim_status_check_call_ivr",
+    "status_inquiry_claim_status_check_review_portal",
+    "denial_clinical_authorization_denial",
+    "denial_administrative_coding_denial",
+    "refunds_overpayments_refund_dispute",
+]
 
+DENIED_STATUSES = [
+    "denied",
+    "denial_clinical_authorization_denial",
+    "denial_administrative_coding_denial",
+]
+
+PAID_STATUSES = [
+    "paid",
+    "payment_contractual_adjustment_write_off",
+]
 class AppealStatus(str, enum.Enum):
     not_started = "not_started"
     drafted = "drafted"

@@ -77,18 +77,26 @@ export function DashboardPage() {
     setLoading(true);
     setError(null);
     try {
-      const [rev, ar, payers, denials, claims] = await Promise.all([
+      const results = await Promise.allSettled([
         api.getRevenueHealth(),
         api.getARHealth(),
         api.getPayerPerformance(),
         api.getDenialIntelligence(),
         api.getClaimsSummary(),
       ]);
-      setRevenueHealth(rev);
-      setArHealth(ar);
-      setPayerPerformance(payers);
-      setDenialIntelligence(denials);
-      setClaimsSummary(claims);
+
+      const [revRes, arRes, payersRes, denialsRes, claimsRes] = results;
+      if (revRes.status === 'fulfilled') setRevenueHealth(revRes.value);
+      if (arRes.status === 'fulfilled') setArHealth(arRes.value);
+      if (payersRes.status === 'fulfilled') setPayerPerformance(payersRes.value);
+      if (denialsRes.status === 'fulfilled') setDenialIntelligence(denialsRes.value);
+      if (claimsRes.status === 'fulfilled') setClaimsSummary(claimsRes.value);
+
+      const allFailed = results.every(r => r.status === 'rejected');
+      if (allFailed) {
+        const firstErr = (results[0] as PromiseRejectedResult).reason;
+        setError(firstErr?.response?.data?.detail || 'Failed to load dashboard data');
+      }
       setLastRefreshed(new Date());
     } catch (err: any) {
       setError(err.response?.data?.detail || 'Failed to load dashboard data');

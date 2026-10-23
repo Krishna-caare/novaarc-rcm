@@ -1,7 +1,7 @@
 from datetime import date
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from app.models import Claim, WorkQueue, ClaimQueueAssignment, ClaimStatus, Denial
+from app.models import Claim, WorkQueue, ClaimQueueAssignment, ClaimStatus, Denial, OPEN_AR_STATUSES, DENIED_STATUSES
 from decimal import Decimal
 
 
@@ -39,18 +39,20 @@ async def determine_queue(db: AsyncSession, claim: Claim) -> WorkQueue | None:
     denial = denial.scalar_one_or_none()
 
     if denial:
-        if denial.appeal_status.value in ["not_started", "drafted"]:
+        appeal_val = getattr(denial.appeal_status, "value", str(denial.appeal_status))
+        if appeal_val in ["not_started", "drafted"]:
             return await get_queue_by_name(db, "Appeals - Drafting")
-        elif denial.appeal_status.value == "submitted":
+        elif appeal_val == "submitted":
             return await get_queue_by_name(db, "Appeals - Follow-up")
 
     if claim.denial_predicted and (claim.denial_probability or 0) > Decimal("0.7"):
         return await get_queue_by_name(db, "High Risk - Denial Prevention")
 
-    if claim.status == ClaimStatus.denied:
+    claim_status_val = getattr(claim.status, "value", str(claim.status))
+    if claim_status_val in DENIED_STATUSES or "denial" in claim_status_val.lower():
         return await get_queue_by_name(db, "Denials - Work")
 
-    if claim.status in [ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process]:
+    if claim_status_val in OPEN_AR_STATUSES:
         try:
             today = date.today()
             if claim.date_of_service:

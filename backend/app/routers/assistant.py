@@ -6,7 +6,7 @@ from typing import Optional
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
-from app.models import Claim, ClaimStatus, Denial, Payment, Payer, Provider
+from app.models import Claim, Denial, Payment, Payer, Provider, OPEN_AR_STATUSES, DENIED_STATUSES
 from app.schemas import AssistantQueryRequest, AssistantQueryResponse
 
 router = APIRouter()
@@ -179,7 +179,7 @@ async def handle_ar_over_90(db: AsyncSession) -> AssistantQueryResponse:
             func.count(Claim.claim_id).label("count")
         )
         .where(
-            Claim.status.in_([ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process, ClaimStatus.denied]),
+            Claim.status.in_(OPEN_AR_STATUSES),
             Claim.date_of_service <= cutoff
         )
     )
@@ -190,7 +190,7 @@ async def handle_ar_over_90(db: AsyncSession) -> AssistantQueryResponse:
 
     total_ar_result = await db.execute(
         select(func.sum(Claim.charge_amount - Claim.paid_amount))
-        .where(Claim.status.in_([ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process, ClaimStatus.denied]))
+        .where(Claim.status.in_(OPEN_AR_STATUSES))
     )
     total_ar = float(total_ar_result.scalar() or 0)
 
@@ -211,7 +211,7 @@ async def handle_ar_over_90(db: AsyncSession) -> AssistantQueryResponse:
 async def handle_denial_rate(db: AsyncSession) -> AssistantQueryResponse:
     total_claims = await db.execute(select(func.count(Claim.claim_id)))
     denied_claims = await db.execute(
-        select(func.count(Claim.claim_id)).where(Claim.status == ClaimStatus.denied)
+        select(func.count(Claim.claim_id)).where(Claim.status.in_(DENIED_STATUSES))
     )
 
     total = total_claims.scalar() or 0
@@ -271,7 +271,7 @@ async def handle_payer_comparison(db: AsyncSession) -> AssistantQueryResponse:
             func.sum(Claim.charge_amount).label("charged"),
             func.sum(Claim.paid_amount).label("paid"),
             func.count(Claim.claim_id).label("claims"),
-            func.sum(func.case((Claim.status == ClaimStatus.denied, 1), else_=0)).label("denials")
+            func.sum(func.case((Claim.status.in_(DENIED_STATUSES), 1), else_=0)).label("denials")
         )
         .join(Claim, Payer.payer_id == Claim.payer_id)
         .group_by(Payer.name)
@@ -331,7 +331,7 @@ async def handle_collection_rate(db: AsyncSession) -> AssistantQueryResponse:
 async def handle_total_ar(db: AsyncSession) -> AssistantQueryResponse:
     result = await db.execute(
         select(func.sum(Claim.charge_amount - Claim.paid_amount))
-        .where(Claim.status.in_([ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process, ClaimStatus.denied]))
+        .where(Claim.status.in_(OPEN_AR_STATUSES))
     )
     total_ar = float(result.scalar() or 0)
 
@@ -354,7 +354,7 @@ async def handle_claims_by_status(db: AsyncSession) -> AssistantQueryResponse:
     )
 
     statuses = [
-        {"status": row[0].value, "count": row[1], "total_charges": float(row[2] or 0)}
+        {"status": row[0].value if hasattr(row[0], "value") else str(row[0]), "count": row[1], "total_charges": float(row[2] or 0)}
         for row in result.all()
     ]
 

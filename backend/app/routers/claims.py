@@ -40,7 +40,7 @@ async def claims_summary(
     return {
         "total_claims": total_val,
         "by_status": [
-            {"status": s.value, "count": c, "total_charges": float(a or 0)}
+            {"status": s.value if hasattr(s, "value") else str(s), "count": c, "total_charges": float(a or 0)}
             for s, c, a in by_status.all()
         ],
         "total_charges": float(total_charges_val),
@@ -69,7 +69,7 @@ async def list_claims(
     )
 
     if status:
-        query = query.where(ClaimModel.status == status)
+        query = query.where(func.lower(ClaimModel.status) == status.lower())
     if payer_id:
         query = query.where(ClaimModel.payer_id == payer_id)
     if provider_id:
@@ -166,11 +166,7 @@ async def update_claim(
     update_data = claim_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         if field == "status" and value is not None:
-            if isinstance(value, str):
-                try:
-                    value = ClaimStatus(value)
-                except ValueError:
-                    pass
+            value = value.value if hasattr(value, "value") else str(value)
         setattr(claim, field, value)
 
     status_str = str(claim.status).lower() if claim.status else ""

@@ -8,7 +8,7 @@ from datetime import date
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user, require_ar_executive
-from app.models import Denial, Claim, AppealStatus, ClaimStatus
+from app.models import Denial, Claim, AppealStatus, ClaimStatus, DENIED_STATUSES
 from app.schemas import Denial as DenialSchema, DenialCreate, DenialUpdate, DenialTopCodesResponse, AppealDraftRequest, AppealDraftResponse
 from app.services.appeal_agent import draft_appeal_letter
 from app.services.agent_logger import log_agent_run
@@ -33,7 +33,7 @@ async def list_denials(
         denial_claim_ids = select(Denial.claim_id)
         unmatched_res = await db.execute(
             select(Claim).where(
-                Claim.status == ClaimStatus.denied,
+                Claim.status.in_(DENIED_STATUSES),
                 ~Claim.claim_id.in_(denial_claim_ids)
             )
         )

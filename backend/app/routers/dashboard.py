@@ -8,7 +8,7 @@ from datetime import date, datetime, timedelta
 
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
-from app.models import Claim, ClaimStatus, Payment, Denial, Payer, Provider, Patient
+from app.models import Claim, Payment, Denial, Payer, Provider, Patient, OPEN_AR_STATUSES, DENIED_STATUSES
 from app.schemas import (
     DashboardRevenueHealth, DashboardARHealth, DashboardPayerPerformance
 )
@@ -25,7 +25,7 @@ async def revenue_health(
     total_paid_res = await db.execute(select(func.sum(Claim.paid_amount)))
     ar_outstanding_res = await db.execute(
         select(func.sum(Claim.charge_amount - Claim.paid_amount))
-        .where(Claim.status.in_([ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process, ClaimStatus.denied]))
+        .where(Claim.status.in_(OPEN_AR_STATUSES))
     )
 
     total_charges_val = total_charges_res.scalar() or Decimal("0")
@@ -38,7 +38,7 @@ async def revenue_health(
             func.floor((func.current_date() - Claim.date_of_service) / 30).label("bucket"),
             func.sum(Claim.charge_amount - Claim.paid_amount).label("amount")
         )
-        .where(Claim.status.in_([ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process, ClaimStatus.denied]))
+        .where(Claim.status.in_(OPEN_AR_STATUSES))
         .group_by("bucket")
     )
     try:
@@ -77,7 +77,7 @@ async def ar_health(
             func.avg(func.current_date() - Claim.date_of_service).label("avg_days")
         )
         .join(Claim, Payer.payer_id == Claim.payer_id)
-        .where(Claim.status.in_([ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process, ClaimStatus.denied]))
+        .where(Claim.status.in_(OPEN_AR_STATUSES))
         .group_by(Payer.payer_id, Payer.name)
     )
     by_payer_result = await db.execute(by_payer_query)
@@ -90,7 +90,7 @@ async def ar_health(
             func.avg(func.current_date() - Claim.date_of_service).label("avg_days")
         )
         .join(Claim, Provider.provider_id == Claim.provider_id)
-        .where(Claim.status.in_([ClaimStatus.submitted, ClaimStatus.acknowledged, ClaimStatus.in_process, ClaimStatus.denied]))
+        .where(Claim.status.in_(OPEN_AR_STATUSES))
         .group_by(Provider.specialty)
     )
     by_specialty_result = await db.execute(by_specialty_query)
@@ -131,7 +131,7 @@ async def payer_performance(
             func.sum(Claim.paid_amount).label("total_paid"),
             func.count(Claim.claim_id).label("claim_count"),
             func.sum(
-                case((Claim.status == ClaimStatus.denied, 1), else_=0)
+                case((Claim.status.in_(DENIED_STATUSES), 1), else_=0)
             ).label("denied_count"),
             func.avg(
                 Payment.posted_date - Claim.date_of_service
