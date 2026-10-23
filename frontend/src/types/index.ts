@@ -5,7 +5,19 @@ export type ClaimStatus =
   | 'in_process' 
   | 'paid' 
   | 'denied' 
-  | 'appealed';
+  | 'appealed'
+  | 'claim_resubmission_call_ivr'
+  | 'claim_resubmission_review_portal'
+  | 'appeals_standard_claim_appeal_review_written'
+  | 'appeals_complex_peer_to_peer_appeal_call_conference'
+  | 'status_inquiry_claim_status_check_call_ivr'
+  | 'status_inquiry_claim_status_check_review_portal'
+  | 'denial_clinical_authorization_denial'
+  | 'denial_administrative_coding_denial'
+  | 'payment_contractual_adjustment_write_off'
+  | 'refunds_overpayments_refund_dispute'
+  | string;
+
 
 export type AppealStatus = 
   | 'not_started' 

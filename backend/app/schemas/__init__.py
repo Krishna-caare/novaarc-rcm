@@ -1,6 +1,6 @@
 from datetime import datetime, date
 from decimal import Decimal
-from typing import Optional, List, Any
+from typing import Optional, List, Any, Union
 from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from enum import Enum
 
@@ -13,6 +13,18 @@ class ClaimStatus(str, Enum):
     paid = "paid"
     denied = "denied"
     appealed = "appealed"
+    # AR RCM Benchmark Statuses
+    claim_resubmission_call_ivr = "claim_resubmission_call_ivr"
+    claim_resubmission_review_portal = "claim_resubmission_review_portal"
+    appeals_standard_claim_appeal_review_written = "appeals_standard_claim_appeal_review_written"
+    appeals_complex_peer_to_peer_appeal_call_conference = "appeals_complex_peer_to_peer_appeal_call_conference"
+    status_inquiry_claim_status_check_call_ivr = "status_inquiry_claim_status_check_call_ivr"
+    status_inquiry_claim_status_check_review_portal = "status_inquiry_claim_status_check_review_portal"
+    denial_clinical_authorization_denial = "denial_clinical_authorization_denial"
+    denial_administrative_coding_denial = "denial_administrative_coding_denial"
+    payment_contractual_adjustment_write_off = "payment_contractual_adjustment_write_off"
+    refunds_overpayments_refund_dispute = "refunds_overpayments_refund_dispute"
+
 
 
 class AppealStatus(str, Enum):
@@ -132,7 +144,7 @@ class ClaimUpdate(BaseModel):
     cpt_codes: Optional[List[str]] = None
     icd10_codes: Optional[List[str]] = None
     modifiers: Optional[List[str]] = None
-    status: Optional[ClaimStatus] = None
+    status: Optional[Union[ClaimStatus, str]] = None
     submitted_at: Optional[datetime] = None
     edi_837_ref: Optional[str] = None
     denial_predicted: Optional[bool] = None
@@ -142,7 +154,7 @@ class ClaimUpdate(BaseModel):
 class Claim(ClaimBase):
     claim_id: int
     paid_amount: Decimal
-    status: ClaimStatus
+    status: Union[ClaimStatus, str]
     submitted_at: Optional[datetime] = None
     edi_837_ref: Optional[str] = None
     denial_predicted: bool

@@ -92,8 +92,10 @@ predict_data = predict_res.json()
 print(f"[TEST 7] AI Denial Predictor -> PASS (Denial Probability: {predict_data.get('probability')}, Risk Factors: {len(predict_data.get('risk_factors', []))})")
 
 # 8. AI Appeal Generator
+denials_list = requests.get(f'{BASE_URL}/denials', headers=headers).json()
+denial_id_to_test = denials_list[0]['denial_id'] if (isinstance(denials_list, list) and len(denials_list) > 0) else 19
 appeal_res = requests.post(
-    f'{BASE_URL}/denials/19/draft-appeal',
+    f'{BASE_URL}/denials/{denial_id_to_test}/draft-appeal',
     json={'additional_context': 'Documentation shows prior auth obtained on 09/01/2026'},
     headers=headers
 )

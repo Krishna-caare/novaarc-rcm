@@ -10,14 +10,128 @@ import {
 import { Modal } from '../components/ui/Modal';
 import { ClaimStatusBadge } from '../components/ui/Badge';
 
+export interface BenchmarkStatusOption {
+  value: string;
+  label: string;
+  category: string;
+  subType: string;
+  channel: string;
+  aht: string;
+  description: string;
+}
+
+export const EDIT_CLAIM_BENCHMARK_STATUSES: BenchmarkStatusOption[] = [
+  {
+    value: 'claim_resubmission_call_ivr',
+    label: 'Claim Resubmission - Resubmit Clean Claim (Call / IVR)',
+    category: 'Claim Resubmission',
+    subType: 'Resubmit Clean Claim',
+    channel: 'Call / IVR',
+    aht: '12 - 15 min',
+    description: 'Speaking with a payer representative to re-transmit a corrected claim or updating line items live.',
+  },
+  {
+    value: 'claim_resubmission_review_portal',
+    label: 'Claim Resubmission - Resubmit Clean Claim (Review / Portal)',
+    category: 'Claim Resubmission',
+    subType: 'Resubmit Clean Claim',
+    channel: 'Review / Portal',
+    aht: '3 - 5 min',
+    description: 'Correcting errors in the billing system and batch-submitting or dropping claims electronically via payer portals/clearinghouses.',
+  },
+  {
+    value: 'appeals_standard_claim_appeal_review_written',
+    label: 'Appeals Processing - Standard Claim Appeal (Review / Written)',
+    category: 'Appeals Processing',
+    subType: 'Standard Claim Appeal',
+    channel: 'Review / Written',
+    aht: '15 - 20 min',
+    description: 'Drafting appeal letters, attaching medical records, clinical notes, and coding justifications for denied claims.',
+  },
+  {
+    value: 'appeals_complex_peer_to_peer_appeal_call_conference',
+    label: 'Appeals Processing - Complex / Peer-to-Peer Appeal (Call / Conference)',
+    category: 'Appeals Processing',
+    subType: 'Complex / Peer-to-Peer Appeal',
+    channel: 'Call / Conference',
+    aht: '25 - 35 min',
+    description: 'Participating in physician peer-to-peer reviews or complex escalated phone appeals with medical directors.',
+  },
+  {
+    value: 'status_inquiry_claim_status_check_call_ivr',
+    label: 'Status Inquiry / Follow-up - Claim Status Check (Call / IVR)',
+    category: 'Status Inquiry / Follow-up',
+    subType: 'Claim Status Check',
+    channel: 'Call / IVR',
+    aht: '5 - 8 min',
+    description: 'Navigating automated phone trees or speaking with agents to check adjudication status, receipt, or reason for pending.',
+  },
+  {
+    value: 'status_inquiry_claim_status_check_review_portal',
+    label: 'Status Inquiry / Follow-up - Claim Status Check (Review / Portal)',
+    category: 'Status Inquiry / Follow-up',
+    subType: 'Claim Status Check',
+    channel: 'Review / Portal',
+    aht: '1 - 3 min',
+    description: 'Batch-checking claim statuses or reviewing remittance advices (835/EOBs) directly on payer portals.',
+  },
+  {
+    value: 'denial_clinical_authorization_denial',
+    label: 'Denial Management - Clinical / Authorization Denial (Review / Analysis)',
+    category: 'Denial Management',
+    subType: 'Clinical / Authorization Denial',
+    channel: 'Review / Analysis',
+    aht: '10 - 15 min',
+    description: 'Investigating clinical denials, verifying prior authorizations, and routing documentation to clinical teams.',
+  },
+  {
+    value: 'denial_administrative_coding_denial',
+    label: 'Denial Management - Administrative / Coding Denial (Review / Correction)',
+    category: 'Denial Management',
+    subType: 'Administrative / Coding Denial',
+    channel: 'Review / Correction',
+    aht: '6 - 10 min',
+    description: 'Fixing modifier errors, NCCI edits, or missing provider credentials and routing for re-billing.',
+  },
+  {
+    value: 'payment_contractual_adjustment_write_off',
+    label: 'Payment Posting & Adjustments - Contractual Adjustment / Write-off (Review / Posting)',
+    category: 'Payment Posting & Adjustments',
+    subType: 'Contractual Adjustment / Write-off',
+    channel: 'Review / Posting',
+    aht: '2 - 4 min',
+    description: 'Posting contractual allowances, write-offs, and processing secondary insurance billing crossovers.',
+  },
+  {
+    value: 'refunds_overpayments_refund_dispute',
+    label: 'Refunds & Overpayments - Refund Processing / Dispute (Review / Correspondence)',
+    category: 'Refunds & Overpayments',
+    subType: 'Refund Processing / Dispute',
+    channel: 'Review / Correspondence',
+    aht: '10 - 15 min',
+    description: 'Verifying duplicate payments or overpayments, validating ledger balances, and processing refund requests.',
+  },
+];
+
+const LEGACY_STATUS_MAP: Record<string, string> = {
+  denied: 'denial_clinical_authorization_denial',
+  appealed: 'appeals_standard_claim_appeal_review_written',
+  paid: 'payment_contractual_adjustment_write_off',
+  submitted: 'claim_resubmission_review_portal',
+  in_process: 'status_inquiry_claim_status_check_call_ivr',
+  acknowledged: 'status_inquiry_claim_status_check_review_portal',
+  created: 'claim_resubmission_call_ivr',
+};
+
 const CLAIM_STATUSES: Array<{value: string, label: string}> = [
-  { value: 'created', label: 'Created' },
-  { value: 'submitted', label: 'Submitted' },
-  { value: 'acknowledged', label: 'Acknowledged' },
-  { value: 'in_process', label: 'In Process' },
-  { value: 'paid', label: 'Paid' },
-  { value: 'denied', label: 'Denied' },
-  { value: 'appealed', label: 'Appealed' },
+  ...EDIT_CLAIM_BENCHMARK_STATUSES.map(s => ({ value: s.value, label: s.label })),
+  { value: 'created', label: 'Legacy: Created' },
+  { value: 'submitted', label: 'Legacy: Submitted' },
+  { value: 'acknowledged', label: 'Legacy: Acknowledged' },
+  { value: 'in_process', label: 'Legacy: In Process' },
+  { value: 'paid', label: 'Legacy: Paid' },
+  { value: 'denied', label: 'Legacy: Denied' },
+  { value: 'appealed', label: 'Legacy: Appealed' },
 ];
 
 export function ClaimsPage() {
@@ -271,9 +385,11 @@ export function ClaimsPage() {
 
   const handleEdit = (claim: Claim) => {
     setSelectedClaim(claim);
+    const isBenchmark = EDIT_CLAIM_BENCHMARK_STATUSES.some(o => o.value === claim.status);
+    const initialStatus = isBenchmark ? claim.status : (LEGACY_STATUS_MAP[claim.status] || claim.status);
     setEditForm({
       charge_amount: String(claim.charge_amount),
-      status: claim.status,
+      status: initialStatus,
       cpt_codes: (claim.cpt_codes || []).join(', '),
       icd10_codes: (claim.icd10_codes || []).join(', '),
     });
@@ -287,7 +403,7 @@ export function ClaimsPage() {
     setError(null);
     const charge = parseFloat(editForm.charge_amount);
     const updatedCharge = isNaN(charge) ? selectedClaim.charge_amount : charge;
-    const isPaid = editForm.status === 'paid';
+    const isPaid = editForm.status === 'paid' || editForm.status.includes('payment') || editForm.status.includes('write_off');
 
     // Optimistic UI update so the user instantly sees the new status & values
     setClaims(prev => prev.map(c => c.claim_id === selectedClaim.claim_id ? {
@@ -694,20 +810,64 @@ export function ClaimsPage() {
             />
           </div>
           <div>
-            <label className="label">Status</label>
+            <div className="flex items-center justify-between mb-1">
+              <label className="label mb-0">Status (AR / RCM Benchmark Action)</label>
+              <span className="text-2xs text-slate-400 font-medium">10 Standard Benchmark Options</span>
+            </div>
             <select
-              className="input"
+              className="input text-sm font-medium"
               value={editForm.status}
               onChange={e => setEditForm(prev => ({ ...prev, status: e.target.value }))}
             >
-              {CLAIM_STATUSES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
+              {EDIT_CLAIM_BENCHMARK_STATUSES.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+              {!EDIT_CLAIM_BENCHMARK_STATUSES.some(o => o.value === editForm.status) && editForm.status && (
+                <option value={editForm.status}>{editForm.status.replace(/_/g, ' ').toUpperCase()} (Current)</option>
+              )}
             </select>
           </div>
-          {editForm.status === 'denied' && (
+
+          {/* ── AR RCM Benchmark Intelligence Card ──────────────────── */}
+          {(() => {
+            const currentBenchmark = EDIT_CLAIM_BENCHMARK_STATUSES.find(s => s.value === editForm.status);
+            if (!currentBenchmark) return null;
+            return (
+              <div className="p-3.5 bg-slate-50 border border-slate-200/90 rounded-xl space-y-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-slate-800 flex items-center gap-1.5">
+                    <span className="w-2 h-2 rounded-full bg-primary-600 inline-block" />
+                    {currentBenchmark.category}
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold text-2xs flex items-center gap-1">
+                    ⏱️ Typical AHT: {currentBenchmark.aht}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600 text-xs">
+                  <span><strong>Sub-Type:</strong> {currentBenchmark.subType}</span>
+                  <span className="text-slate-500 font-medium"><strong>Mode:</strong> {currentBenchmark.channel}</span>
+                </div>
+                <p className="text-slate-600 bg-white p-2.5 rounded-lg border border-slate-200/70 leading-relaxed italic text-xs">
+                  {currentBenchmark.description}
+                </p>
+              </div>
+            );
+          })()}
+
+          {(editForm.status.includes('denial') || editForm.status === 'denied') && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-xl text-xs text-rose-800 flex items-start gap-2">
               <ShieldAlert className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
               <span>
-                <strong>Denial Workflow Trigger:</strong> Setting status to &quot;Denied&quot; automatically creates a Denial record (CO-16) and queues this claim in the Denials Management & Appeals workbench.
+                <strong>Denial Workflow Trigger:</strong> Setting status to Denial Management automatically queues this claim in the Denials Management & Appeals workbench.
+              </span>
+            </div>
+          )}
+
+          {(editForm.status.includes('payment') || editForm.status === 'paid' || editForm.status.includes('write_off')) && (
+            <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-xs text-emerald-800 flex items-start gap-2">
+              <Check className="w-4 h-4 text-emerald-600 flex-shrink-0 mt-0.5" />
+              <span>
+                <strong>Payment & Adjustment Posting:</strong> Contractual allowances, write-offs, and payment ledgers will be synchronized.
               </span>
             </div>
           )}

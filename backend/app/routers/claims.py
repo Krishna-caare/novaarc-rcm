@@ -51,7 +51,7 @@ async def claims_summary(
 
 @router.get("", response_model=list[ClaimSchema])
 async def list_claims(
-    status: Optional[ClaimStatus] = None,
+    status: Optional[str] = None,
     payer_id: Optional[int] = None,
     provider_id: Optional[int] = None,
     patient_id: Optional[int] = None,
@@ -173,7 +173,11 @@ async def update_claim(
                     pass
         setattr(claim, field, value)
 
-    if claim.status == ClaimStatus.paid:
+    status_str = str(claim.status).lower() if claim.status else ""
+    is_paid_status = claim.status == ClaimStatus.paid or "payment" in status_str or "write_off" in status_str
+    is_denied_status = claim.status == ClaimStatus.denied or "denial" in status_str
+
+    if is_paid_status:
         if claim.paid_amount is None or claim.paid_amount == 0:
             claim.paid_amount = claim.charge_amount
         # Check if a Payment record exists, if not create one so it appears in Payments page
@@ -187,23 +191,24 @@ async def update_claim(
                 payer_id=claim.payer_id,
             ))
 
-    if claim.status == ClaimStatus.submitted and not claim.submitted_at:
+    if (claim.status == ClaimStatus.submitted or "resubmit" in status_str) and not claim.submitted_at:
         claim.submitted_at = func.now()
         if not claim.edi_837_ref:
             claim.edi_837_ref = f"EDI837-{claim_id}-{int(datetime.utcnow().timestamp())}"
 
     # If status is set to denied, ensure a Denial record exists so it shows in Denials page and queue
-    if claim.status == ClaimStatus.denied:
+    if is_denied_status:
         denial_check = await db.execute(select(Denial).where(Denial.claim_id == claim_id))
         existing_denial = denial_check.scalar_one_or_none()
         if not existing_denial:
+            root_cause = "Clinical / Authorization Denial" if "clinical" in status_str else "Administrative / Coding Denial"
             new_denial = Denial(
                 claim_id=claim_id,
-                denial_code="CO-16",
+                denial_code="CO-16" if "clinical" in status_str else "CO-18",
                 description="Claim/service lacks information or has submission/billing error(s)",
                 denied_amount=claim.charge_amount,
                 denial_date=date.today(),
-                root_cause="Missing Information / Billing Error",
+                root_cause=root_cause,
                 appeal_status=AppealStatus.not_started,
                 appeal_drafted_by_ai=False,
             )
@@ -211,7 +216,7 @@ async def update_claim(
 
     await db.commit()
 
-    if claim.status == ClaimStatus.denied:
+    if is_denied_status:
         try:
             await assign_claim_to_queue(db, claim_id)
         except Exception:

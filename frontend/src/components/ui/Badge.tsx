@@ -61,6 +61,17 @@ const STATUS_CONFIGS: Record<string, { variant: BadgeVariant; label: string }> =
   approved:     { variant: 'success',  label: 'Approved'     },
   rejected:     { variant: 'danger',   label: 'Rejected'     },
   edited:       { variant: 'warning',  label: 'Edited'       },
+  // 10 AR RCM Benchmark Statuses
+  claim_resubmission_call_ivr:                         { variant: 'info',    label: 'Resubmit Claim (Call/IVR)' },
+  claim_resubmission_review_portal:                    { variant: 'info',    label: 'Resubmit Claim (Portal)' },
+  appeals_standard_claim_appeal_review_written:        { variant: 'purple',  label: 'Standard Appeal (Written)' },
+  appeals_complex_peer_to_peer_appeal_call_conference: { variant: 'purple',  label: 'Complex Appeal (Peer-to-Peer)' },
+  status_inquiry_claim_status_check_call_ivr:          { variant: 'warning', label: 'Status Inquiry (Call/IVR)' },
+  status_inquiry_claim_status_check_review_portal:     { variant: 'warning', label: 'Status Inquiry (Portal)' },
+  denial_clinical_authorization_denial:                { variant: 'danger',  label: 'Clinical / Auth Denial' },
+  denial_administrative_coding_denial:                 { variant: 'danger',  label: 'Admin / Coding Denial' },
+  payment_contractual_adjustment_write_off:            { variant: 'success', label: 'Contractual Adj / Write-off' },
+  refunds_overpayments_refund_dispute:                 { variant: 'primary', label: 'Refund / Dispute' },
 };
 
 interface ClaimStatusBadgeProps {

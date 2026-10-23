@@ -68,7 +68,7 @@ class DenialPredictor:
             (pd.Timestamp.now() - pd.Timestamp(claim.date_of_service)).days if claim.date_of_service else 0,
             payer_denial_rate,
             provider_denial_rate,
-            status_map.get(claim.status.value, 0)
+            status_map.get(getattr(claim.status, "value", str(claim.status)), 0)
         ]
         return np.array(features).reshape(1, -1)
 

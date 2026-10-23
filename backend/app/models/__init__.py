@@ -17,6 +17,18 @@ class ClaimStatus(str, enum.Enum):
     paid = "paid"
     denied = "denied"
     appealed = "appealed"
+    # AR RCM Benchmark Statuses
+    claim_resubmission_call_ivr = "claim_resubmission_call_ivr"
+    claim_resubmission_review_portal = "claim_resubmission_review_portal"
+    appeals_standard_claim_appeal_review_written = "appeals_standard_claim_appeal_review_written"
+    appeals_complex_peer_to_peer_appeal_call_conference = "appeals_complex_peer_to_peer_appeal_call_conference"
+    status_inquiry_claim_status_check_call_ivr = "status_inquiry_claim_status_check_call_ivr"
+    status_inquiry_claim_status_check_review_portal = "status_inquiry_claim_status_check_review_portal"
+    denial_clinical_authorization_denial = "denial_clinical_authorization_denial"
+    denial_administrative_coding_denial = "denial_administrative_coding_denial"
+    payment_contractual_adjustment_write_off = "payment_contractual_adjustment_write_off"
+    refunds_overpayments_refund_dispute = "refunds_overpayments_refund_dispute"
+
 
 
 class AppealStatus(str, enum.Enum):
@@ -99,7 +111,7 @@ class Claim(Base):
     cpt_codes = Column(ARRAY(Text).with_variant(JSON, "sqlite"), default=list)
     icd10_codes = Column(ARRAY(Text).with_variant(JSON, "sqlite"), default=list)
     modifiers = Column(ARRAY(Text).with_variant(JSON, "sqlite"), default=list)
-    status = Column(SQLEnum(ClaimStatus), default=ClaimStatus.created, nullable=False, index=True)
+    status = Column(String(100), default="created", nullable=False, index=True)
     submitted_at = Column(DateTime)
     edi_837_ref = Column(String(100))
     denial_predicted = Column(Boolean, default=False)
