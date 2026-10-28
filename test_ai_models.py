@@ -1,9 +1,10 @@
+import os
 import requests
 import json
 import time
 
-BASE_URL = 'https://novaarc-backend.onrender.com'
-FRONTEND_URL = 'https://novaarc.netlify.app'
+BASE_URL = os.getenv('BASE_URL', 'https://novaarc-backend-i4qm.onrender.com')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://novaarc.netlify.app')
 
 print("=" * 70)
 print("NovaArc RCM - Live AI Models Verification with New OpenRouter Key")
@@ -50,7 +51,9 @@ t0 = time.time()
 appeal_payload = {
     'additional_context': 'Prior authorization was previously obtained under auth number PA-8923412. Medical necessity documentation attached showing failed conservative therapy for 6 months.'
 }
-appeal_res = requests.post(f'{BASE_URL}/denials/19/draft-appeal', json=appeal_payload, headers=headers, timeout=60)
+denials_list = requests.get(f'{BASE_URL}/denials', headers=headers).json()
+denial_id = denials_list[0]['denial_id'] if (isinstance(denials_list, list) and len(denials_list) > 0) else 1
+appeal_res = requests.post(f'{BASE_URL}/denials/{denial_id}/draft-appeal', json=appeal_payload, headers=headers, timeout=60)
 dt = round(time.time() - t0, 2)
 print(f"Appeal Generator Response [{appeal_res.status_code}] in {dt}s:")
 if appeal_res.status_code == 200:

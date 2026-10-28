@@ -1,4 +1,5 @@
 import os
+import asyncio
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -10,10 +11,9 @@ from app.routers import (
 )
 
 
-@asynccontextmanager
-async def lifespan(app: FastAPI):
-    await init_db()
+async def _async_init_db():
     try:
+        await init_db()
         from app.core.database import AsyncSessionLocal
         from app.models import User
         from sqlalchemy import select, func
@@ -26,8 +26,17 @@ async def lifespan(app: FastAPI):
                 await seed_main()
                 print("Initial seed completed successfully!")
     except Exception as e:
-        print(f"Auto-seed check/execution notice: {e}")
+        print(f"Database initialization / seed notice: {e}")
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Launch schema verification and auto-seed in background so Uvicorn binds port
+    # and answers Render health check probes immediately without hitting 5s timeout.
+    init_task = asyncio.create_task(_async_init_db())
     yield
+    if not init_task.done():
+        init_task.cancel()
 
 
 app = FastAPI(
@@ -89,6 +98,11 @@ async def global_exception_handler(request: Request, exc: Exception):
     )
 
 
-@app.get("/health")
+@app.api_route("/", methods=["GET", "HEAD"])
+async def root():
+    return {"status": "healthy", "service": "novaarc-rcm", "version": "1.0.2"}
+
+
+@app.api_route("/health", methods=["GET", "HEAD"])
 async def health_check():
     return {"status": "healthy", "service": "novaarc-rcm", "version": "1.0.2"}

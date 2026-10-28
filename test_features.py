@@ -3,8 +3,8 @@ import json
 
 import os
 
-BASE_URL = os.getenv('BASE_URL', 'http://localhost:8000')
-FRONTEND_URL = os.getenv('FRONTEND_URL', 'http://localhost:5174')
+BASE_URL = os.getenv('BASE_URL', 'https://novaarc-backend-i4qm.onrender.com')
+FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://novaarc.netlify.app')
 
 print("=" * 60)
 print("NovaArc RCM - Comprehensive Live E2E Verification")

@@ -12,7 +12,8 @@ from app.models import Claim, Denial, ClaimStatus
 from app.core.config import settings
 
 
-MODEL_PATH = Path("models/denial_predictor.pkl")
+_default_model_path = Path(__file__).resolve().parent.parent.parent / "models" / "denial_predictor.pkl"
+MODEL_PATH = _default_model_path if _default_model_path.exists() else Path("models/denial_predictor.pkl")
 FEATURE_NAMES = [
     "payer_id", "provider_specialty_encoded", "charge_amount", "num_cpt_codes",
     "num_icd10_codes", "has_prior_denial", "days_since_service", "avg_denial_rate_payer",
@@ -27,11 +28,24 @@ class DenialPredictor:
         self.feature_names = FEATURE_NAMES
 
     def load_model(self):
+        if self.model is not None and self.scaler is not None:
+            return
         if MODEL_PATH.exists():
-            with open(MODEL_PATH, "rb") as f:
-                data = pickle.load(f)
-                self.model = data["model"]
-                self.scaler = data["scaler"]
+            try:
+                import sys
+                if not hasattr(np, "_core") and "numpy._core" not in sys.modules:
+                    if hasattr(np, "core"):
+                        sys.modules["numpy._core"] = np.core
+                        if hasattr(np.core, "numeric"):
+                            sys.modules["numpy._core.numeric"] = np.core.numeric
+                with open(MODEL_PATH, "rb") as f:
+                    data = pickle.load(f)
+                    self.model = data["model"]
+                    self.scaler = data["scaler"]
+            except Exception as e:
+                import logging
+                logging.getLogger(__name__).warning(f"Failed to load {MODEL_PATH} ({e}), initializing fallback model...")
+                self._train_dummy_model()
         else:
             self._train_dummy_model()
 
@@ -50,9 +64,12 @@ class DenialPredictor:
         self.model = RandomForestClassifier(n_estimators=100, random_state=42)
         self.model.fit(X_scaled, y)
 
-        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with open(MODEL_PATH, "wb") as f:
-            pickle.dump({"model": self.model, "scaler": self.scaler}, f)
+        try:
+            MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+            with open(MODEL_PATH, "wb") as f:
+                pickle.dump({"model": self.model, "scaler": self.scaler}, f)
+        except Exception:
+            pass
 
     def extract_features(self, claim: Claim, payer_denial_rate: float, provider_denial_rate: float, has_prior_denial: bool) -> np.ndarray:
         specialty_map = {"Cardiology": 1, "Orthopedics": 2, "Primary Care": 3, "Radiology": 4, "Other": 0}

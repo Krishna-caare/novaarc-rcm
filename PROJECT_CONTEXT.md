@@ -15,7 +15,7 @@
 
 | Component | Platform | Live Production URL | Notes |
 |---|---|---|---|
-| **Backend API** | Render | `https://novaarc-backend.onrender.com` | FastAPI, PostgreSQL, OpenRouter, Healthcheck at `/health` |
+| **Backend API** | Render | `https://novaarc-backend-i4qm.onrender.com` | FastAPI, PostgreSQL, OpenRouter, Healthcheck at `/health` |
 | **Frontend Web App** | Netlify | `https://novaarc-rcm-app.netlify.app` | Vite + React SPA, continuous deployment |
 | **Frontend Mirror** | GitHub Pages | `https://krishna-caare.github.io/novaarc-rcm/` | Base path `/novaarc-rcm/`, automated 404 SPA routing |
 

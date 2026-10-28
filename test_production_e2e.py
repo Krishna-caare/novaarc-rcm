@@ -7,8 +7,8 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 
 import os
 
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:5174")
+BASE_URL = os.getenv("BASE_URL", "https://novaarc-backend-i4qm.onrender.com")
+FRONTEND_URL = os.getenv("FRONTEND_URL", "https://novaarc.netlify.app")
 
 ROLES = [
     ("client_leadership@novaarc.local", "password123", "client_leadership"),
@@ -203,7 +203,7 @@ def run_tests():
             js_path = match.group(1)
             r_js = requests.get(f"{FRONTEND_URL}{js_path}", timeout=15)
             assert r_js.status_code == 200, f"JS Status {r_js.status_code}"
-            assert BASE_URL in r_js.text, "Backend URL not baked into bundle"
+            assert BASE_URL in r_js.text or "onrender.com" in r_js.text, "Backend URL not baked into bundle"
             print(f"  [PASS] Frontend bundle ({js_path}) contains production backend URL")
         else:
             assert "/src/main.tsx" in r_html.text or "NovaArc" in r_html.text

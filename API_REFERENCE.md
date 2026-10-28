@@ -2,7 +2,7 @@
 
 > **Target Audience**: AI Agents (resuming from truncated context), API Integrators, Backend & Frontend Developers.
 > **Backend Base URL (Local)**: `http://localhost:8000`
-> **Backend Base URL (Production)**: `https://novaarc-backend.onrender.com`
+> **Backend Base URL (Production)**: `https://novaarc-backend-i4qm.onrender.com`
 > **Authentication**: All protected endpoints require `Authorization: Bearer <access_token>`.
 
 ---

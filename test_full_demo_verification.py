@@ -11,7 +11,7 @@ sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8', errors='repla
 
 import os
 
-BASE_URL = os.getenv("BASE_URL", "http://localhost:8000")
+BASE_URL = os.getenv("BASE_URL", "https://novaarc-backend-i4qm.onrender.com")
 FRONTEND_NETLIFY = "https://novaarc-rcm-app.netlify.app"
 FRONTEND_GH_PAGES = "https://krishna-caare.github.io/novaarc-rcm/"
 
@@ -132,10 +132,16 @@ def run():
     new_claim_id = None
     try:
         # A: Create Claim
+        ref_res = requests.get(f"{BASE_URL}/claims/reference-data", headers=headers, timeout=15)
+        ref_data = ref_res.json()
+        p_id = ref_data["patients"][0]["patient_id"]
+        pr_id = ref_data["providers"][0]["provider_id"]
+        py_id = ref_data["payers"][0]["payer_id"]
+
         claim_payload = {
-            "patient_id": 1,
-            "provider_id": 1,
-            "payer_id": 1,
+            "patient_id": p_id,
+            "provider_id": pr_id,
+            "payer_id": py_id,
             "date_of_service": "2026-09-16",
             "charge_amount": 250.00,
             "cpt_codes": ["99214"],
@@ -241,7 +247,10 @@ def run():
     print("\n[STEP 7] Testing All Specialized AI Agents...")
     # Denial Predictor AI (takes claim_id)
     try:
-        target_claim_id = new_claim_id or 1
+        target_claim_id = new_claim_id
+        if not target_claim_id:
+            claims_res = requests.get(f"{BASE_URL}/claims", headers=headers, timeout=15).json()
+            target_claim_id = claims_res[0]["claim_id"] if claims_res else 1
         pred_payload = {"claim_id": target_claim_id}
         pred_res = requests.post(f"{BASE_URL}/agents/denial-predict", json=pred_payload, headers=headers, timeout=30)
         assert pred_res.status_code == 200, f"Status {pred_res.status_code}: {pred_res.text}"
