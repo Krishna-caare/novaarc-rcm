@@ -92,7 +92,7 @@ If no SQL is needed, provide a concise analytical answer."""
                             "Authorization": f"Bearer {openrouter_key}",
                             "Content-Type": "application/json",
                             "HTTP-Referer": "https://novaarc.netlify.app",
-                            "X-Title": "NovaArc RCM"
+                            "X-Title": "Smart Agent RCM"
                         },
                         json={
                             "model": model,

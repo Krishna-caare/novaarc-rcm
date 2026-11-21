@@ -216,7 +216,7 @@ async def run_denial_rag(claim_context: Dict[str, Any]) -> Dict[str, Any]:
                                 "Authorization": f"Bearer {openrouter_key}",
                                 "Content-Type": "application/json",
                                 "HTTP-Referer": "https://novaarc.netlify.app",
-                                "X-Title": "NovaArc RCM"
+                                "X-Title": "Smart Agent RCM"
                             },
                             json={
                                 "model": model,

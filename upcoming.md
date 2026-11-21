@@ -1,6 +1,6 @@
-# NovaArc RCM — Upcoming Enterprise Roadmap (4 Strategic Phases)
+# Smart Agent RCM — Upcoming Enterprise Roadmap (4 Strategic Phases)
 
-This document tracks the **4 strategic enterprise upgrades** scheduled for future implementation to transition NovaArc RCM into a commercial-grade autonomous revenue cycle platform.
+This document tracks the **4 strategic enterprise upgrades** scheduled for future implementation to transition Smart Agent RCM into a commercial-grade autonomous revenue cycle platform.
 
 ---
 

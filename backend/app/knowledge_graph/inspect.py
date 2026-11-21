@@ -26,7 +26,7 @@ def print_code_subgraph(code_str: str):
         return
 
     print("=" * 85)
-    print(f"{BOLD}{CYAN}NOVAARC RCM — DENIAL KNOWLEDGE GRAPH INSPECTOR{RESET}")
+    print(f"{BOLD}{CYAN}SMART AGENT RCM — DENIAL KNOWLEDGE GRAPH INSPECTOR{RESET}")
     print(f"{BOLD}CARC CODE:{RESET} {YELLOW}{subgraph.code}{RESET} — {subgraph.code_description}")
     print(f"{BOLD}CATEGORY:{RESET}  {BLUE}{subgraph.category}{RESET}")
     print(f"{BOLD}SUBGRAPH METRICS:{RESET} {len(subgraph.nodes)} Connected Nodes | {len(subgraph.edges)} Relational Edges")
@@ -77,7 +77,7 @@ def print_code_subgraph(code_str: str):
 def print_overview():
     overview = denial_kg.get_overview()
     print("=" * 85)
-    print(f"{BOLD}{CYAN}NOVAARC RCM — KNOWLEDGE GRAPH OVERVIEW{RESET}")
+    print(f"{BOLD}{CYAN}SMART AGENT RCM — KNOWLEDGE GRAPH OVERVIEW{RESET}")
     print(f"Total Nodes: {overview['total_nodes']} | Total Edges: {overview['total_edges']}")
     print("-" * 85)
     print(f"{BOLD}Categories:{RESET}")

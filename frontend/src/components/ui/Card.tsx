@@ -7,7 +7,7 @@ interface CardProps {
   /** 'default' | 'hover' (adds lift on hover) | 'elevated' | 'flat' */
   variant?:   'default' | 'hover' | 'elevated' | 'flat';
   /** Left accent stripe color (for metric cards) */
-  accent?:    'blue' | 'green' | 'amber' | 'purple' | 'red' | 'none';
+  accent?:    'blue' | 'green' | 'amber' | 'amber-soft' | 'purple' | 'red' | 'none';
 }
 
 const variantMap: Record<NonNullable<CardProps['variant']>, string> = {
@@ -18,11 +18,12 @@ const variantMap: Record<NonNullable<CardProps['variant']>, string> = {
 };
 
 const accentMap: Record<NonNullable<Exclude<CardProps['accent'], 'none'>>, string> = {
-  blue:   'metric-accent-blue',
-  green:  'metric-accent-green',
-  amber:  'metric-accent-amber',
-  purple: 'metric-accent-purple',
-  red:    'metric-accent-red',
+  blue:         'metric-accent-blue',
+  green:        'metric-accent-green',
+  amber:        'metric-accent-amber',
+  'amber-soft': 'metric-accent-amber-soft',
+  purple:       'metric-accent-purple',
+  red:          'metric-accent-red',
 };
 
 export function Card({ className, children, variant = 'default', accent = 'none' }: CardProps) {

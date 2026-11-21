@@ -847,7 +847,7 @@ export function DenialsPage() {
                   {/* Status Heading */}
                   <div className="space-y-1.5 max-w-md">
                     <h3 className="text-lg font-bold text-slate-900">
-                      NovaArc AI is Drafting Your Appeal Letter...
+                      Smart Agent AI is Drafting Your Appeal Letter...
                     </h3>
                     <p className="text-xs text-slate-500">
                       Powered by <span className="font-semibold text-blue-600">Ling 3.0 Flash Santé</span> & <span className="font-semibold text-indigo-600">Nemotron 3.5</span> for clinical precision and medical necessity citations.

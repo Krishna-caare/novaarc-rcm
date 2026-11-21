@@ -394,7 +394,7 @@ export function AgentsPage() {
       setAppealResult(res);
     } catch (err: any) {
       setAppealResult({
-        appeal_letter: `APPEAL RECONSIDERATION REQUEST\nDate: ${new Date().toLocaleDateString()}\nTo: Medical Review & Appeals Department\nClaim Reference: CLM-${appealDenialId}\n\nDear Appeals Committee,\n\nWe are writing to formally appeal the denial (CARC CO-16) for claim CLM-${appealDenialId}. The services rendered on the date of service were medically necessary and fully documented in accordance with CMS guidelines and LCD requirements.\n\nEnclosed please find the detailed clinical encounter notes, operative report, and signed physician certification demonstrating medical necessity.\n\nWe respectfully request immediate reprocessing and full reimbursement of this claim.\n\nSincerely,\nNovaArc Revenue Cycle Management Team`
+        appeal_letter: `APPEAL RECONSIDERATION REQUEST\nDate: ${new Date().toLocaleDateString()}\nTo: Medical Review & Appeals Department\nClaim Reference: CLM-${appealDenialId}\n\nDear Appeals Committee,\n\nWe are writing to formally appeal the denial (CARC CO-16) for claim CLM-${appealDenialId}. The services rendered on the date of service were medically necessary and fully documented in accordance with CMS guidelines and LCD requirements.\n\nEnclosed please find the detailed clinical encounter notes, operative report, and signed physician certification demonstrating medical necessity.\n\nWe respectfully request immediate reprocessing and full reimbursement of this claim.\n\nSincerely,\nSmart Agent Revenue Cycle Management Team`
       });
     } finally {
       setAppealLoading(false);
@@ -567,11 +567,11 @@ export function AgentsPage() {
                   type="button"
                   onClick={() => handleRunCodingAssist()}
                   disabled={codingLoading || !clinicalNotes.trim()}
-                  className="btn-primary inline-flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white shadow-blue-500/20"
+                  className="btn-primary inline-flex items-center gap-2"
                 >
                   {codingLoading ? (
                     <>
-                      <Loader2 className="w-4 h-4 animate-spin text-white" />
+                      <Loader2 className="w-4 h-4 animate-spin text-sa-charcoal" />
                       Analyzing Clinical Notes...
                     </>
                   ) : (

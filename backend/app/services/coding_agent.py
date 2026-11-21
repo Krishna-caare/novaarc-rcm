@@ -65,7 +65,7 @@ async def call_openrouter(messages: list[dict], temperature: float = 0.3) -> dic
                         "Authorization": f"Bearer {key}",
                         "Content-Type": "application/json",
                         "HTTP-Referer": "https://novaarc.netlify.app",
-                        "X-Title": "NovaArc RCM"
+                        "X-Title": "Smart Agent RCM"
                     },
                     json={
                         "model": model,

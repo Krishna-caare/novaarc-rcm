@@ -6,6 +6,12 @@
 
 /* ─── Base Reset ─────────────────────────────────────────────────────────── */
 :root {
+  --sa-charcoal:       #1C1F24;
+  --sa-charcoal-card:  #2C3037;
+  --sa-amber:          #F5B31B;
+  --sa-amber-strong:   #F0A21A;
+  --sa-amber-soft:     #FDE29B;
+
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   font-feature-settings: 'cv11', 'ss01';
   font-variation-settings: 'opsz' 32;
@@ -42,10 +48,10 @@ body {
   }
 
   .btn-primary {
-    @apply btn bg-primary-700 text-white shadow-btn-primary
-           hover:bg-primary-800 hover:-translate-y-px hover:shadow-card-hover
+    @apply btn bg-sa-amber text-sa-charcoal font-semibold shadow-btn
+           hover:bg-sa-amber-strong hover:-translate-y-px hover:shadow-card-hover
            active:translate-y-0 active:shadow-btn
-           focus:ring-primary-500;
+           focus:ring-sa-amber;
   }
 
   .btn-secondary {
@@ -90,7 +96,7 @@ body {
            bg-white border border-slate-200 rounded-lg
            shadow-inset-sm
            transition-all duration-150
-           focus:outline-none focus:ring-2 focus:ring-primary-600/30 focus:border-primary-500
+           focus:outline-none focus:ring-2 focus:ring-sa-amber focus:border-sa-amber
            hover:border-slate-300
            disabled:bg-slate-50 disabled:text-slate-400 disabled:cursor-not-allowed;
   }
@@ -337,14 +343,14 @@ body {
 
 /* ─── Focus Visible ──────────────────────────────────────────────────────── */
 :focus-visible {
-  outline: 2px solid #2563EB;
+  outline: 2px solid var(--sa-amber);
   outline-offset: 2px;
 }
 
 /* ─── Selection ──────────────────────────────────────────────────────────── */
 ::selection {
-  background: rgba(37, 99, 235, 0.15);
-  color: #1E3A5F;
+  background: rgba(245, 179, 27, 0.2);
+  color: #1C1F24;
 }
 
 /* ─── Animations ─────────────────────────────────────────────────────────── */
@@ -385,8 +391,9 @@ body {
 }
 
 /* Metric card accent stripe */
-.metric-accent-blue   { box-shadow: inset 4px 0 0 #2563EB; }
-.metric-accent-green  { box-shadow: inset 4px 0 0 #059669; }
-.metric-accent-amber  { box-shadow: inset 4px 0 0 #D97706; }
-.metric-accent-purple { box-shadow: inset 4px 0 0 #7C3AED; }
-.metric-accent-red    { box-shadow: inset 4px 0 0 #DC2626; }
+.metric-accent-blue       { box-shadow: inset 4px 0 0 #2563EB; }
+.metric-accent-green      { box-shadow: inset 4px 0 0 #059669; }
+.metric-accent-amber      { box-shadow: inset 4px 0 0 var(--sa-amber); }
+.metric-accent-amber-soft { box-shadow: inset 4px 0 0 var(--sa-amber-soft); }
+.metric-accent-purple     { box-shadow: inset 4px 0 0 #7C3AED; }
+.metric-accent-red        { box-shadow: inset 4px 0 0 #DC2626; }

@@ -1,4 +1,4 @@
-# NovaArc RCM — System Architecture, Domain Guide & Project Context
+# Smart Agent RCM — System Architecture, Domain Guide & Project Context
 
 > **Target Audience**: AI Agents (resuming after context window truncation or compaction), Systems Engineers, Healthcare RCM Specialists, and Full-Stack Developers.
 > **Last Updated**: September 2026
@@ -9,7 +9,7 @@
 
 ## 1. Executive Overview
 
-**NovaArc RCM** is an enterprise-grade, agentic AI Revenue Cycle Management (RCM) platform built for healthcare organizations, hospitals, and medical billing agencies. It combines end-to-end medical claims lifecycle automation with specialized healthcare Large Language Models (LLMs) and Machine Learning (ML) models to accelerate reimbursement, reduce claim denials, automate clinical appeal drafting, and provide conversational financial intelligence.
+**Smart Agent RCM** is an enterprise-grade, agentic AI Revenue Cycle Management (RCM) platform built for healthcare organizations, hospitals, and medical billing agencies. It combines end-to-end medical claims lifecycle automation with specialized healthcare Large Language Models (LLMs) and Machine Learning (ML) models to accelerate reimbursement, reduce claim denials, automate clinical appeal drafting, and provide conversational financial intelligence.
 
 ### Live Production Environments
 

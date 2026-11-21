@@ -7,6 +7,14 @@ export default {
   theme: {
     extend: {
       colors: {
+        // Smart Agent Charcoal + Amber accent palette
+        sa: {
+          charcoal:        'var(--sa-charcoal)',
+          'charcoal-card': 'var(--sa-charcoal-card)',
+          amber:           'var(--sa-amber)',
+          'amber-strong':  'var(--sa-amber-strong)',
+          'amber-soft':    'var(--sa-amber-soft)',
+        },
         // Primary Navy - RCM brand identity
         primary: {
           50:  '#EEF3FA',

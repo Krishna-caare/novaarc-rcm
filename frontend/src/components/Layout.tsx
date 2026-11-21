@@ -83,23 +83,23 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         />
       )}
 
-      {/* Sidebar panel — Dark Navy Theme */}
+      {/* Sidebar panel — Charcoal + Amber Theme */}
       <aside className={cn(
         'fixed inset-y-0 left-0 z-50 w-64 flex flex-col',
-        'bg-[#132c4a] border-r border-[#1e3e66] shadow-xl',
+        'bg-sa-charcoal border-r border-sa-charcoal-card shadow-xl',
         'transform transition-transform duration-250 ease-spring',
         'lg:translate-x-0',
         open ? 'translate-x-0' : '-translate-x-full',
       )}>
         {/* Logo */}
-        <div className="flex items-center justify-between h-16 px-5 border-b border-[#1e3e66] bg-[#0f243d] flex-shrink-0">
+        <div className="flex items-center justify-between h-16 px-5 border-b border-sa-charcoal-card bg-sa-charcoal flex-shrink-0">
           <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 flex items-center justify-center flex-shrink-0 shadow-md">
-              <Activity className="w-4.5 h-4.5 text-white" />
+            <div className="w-8 h-8 rounded-xl bg-sa-amber flex items-center justify-center flex-shrink-0 shadow-md">
+              <Activity className="w-4.5 h-4.5 text-sa-charcoal" />
             </div>
             <div>
-              <span className="text-base font-bold text-white tracking-tight">NovaArc</span>
-              <span className="ml-1.5 text-2xs font-bold bg-blue-900/60 text-blue-300 px-1.5 py-0.5 rounded uppercase tracking-wider border border-blue-700/50">
+              <span className="text-base font-bold text-white tracking-tight">Smart Agent</span>
+              <span className="ml-1.5 text-2xs font-bold bg-sa-amber-soft text-sa-amber-strong px-1.5 py-0.5 rounded uppercase tracking-wider border border-sa-amber-strong/30">
                 RCM
               </span>
             </div>
@@ -129,19 +129,19 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
                       'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium',
                       'transition-all duration-150 cursor-pointer select-none group',
                       isActive
-                        ? 'bg-blue-600 text-white font-semibold shadow-md'
-                        : 'text-slate-300 hover:bg-white/10 hover:text-white',
+                        ? 'bg-sa-amber text-sa-charcoal font-semibold shadow-md'
+                        : 'text-slate-300 hover:bg-sa-charcoal-card hover:text-white',
                     )}
                   >
                     {({ isActive }) => (
                       <>
                         <item.icon className={cn(
                           'w-4.5 h-4.5 flex-shrink-0 transition-colors',
-                          isActive ? 'text-white' : item.iconColor,
+                          isActive ? 'text-sa-charcoal' : item.iconColor,
                         )} style={{ width: '1.125rem', height: '1.125rem' }} />
                         <span className="truncate">{item.name}</span>
                         {isActive && (
-                          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />
+                          <span className="ml-auto w-1.5 h-1.5 rounded-full bg-sa-charcoal" />
                         )}
                       </>
                     )}
@@ -153,8 +153,8 @@ function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
         </nav>
 
         {/* User footer */}
-        <div className="p-3 border-t border-[#1e3e66] bg-[#0e2137] flex-shrink-0">
-          <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-white/5 border border-white/5">
+        <div className="p-3 border-t border-sa-charcoal-card bg-sa-charcoal flex-shrink-0">
+          <div className="flex items-center gap-3 px-2 py-2 rounded-xl bg-sa-charcoal-card border border-white/5">
             <UserAvatar name={user?.name} size="sm" />
             <div className="flex-1 min-w-0">
               <p className="text-sm font-semibold text-white truncate">{user?.name || 'User'}</p>
@@ -206,7 +206,7 @@ function TopHeader({ onMenuClick }: { onMenuClick: () => void }) {
             <Menu className="w-5 h-5" />
           </button>
           <div className="flex items-center gap-2 text-sm">
-            <span className="hidden sm:block text-slate-400 font-medium">NovaArc RCM</span>
+            <span className="hidden sm:block text-slate-400 font-medium">Smart Agent RCM</span>
             <span className="hidden sm:block text-slate-300">/</span>
             <span className="font-semibold text-slate-800">{pageTitle}</span>
           </div>
@@ -305,7 +305,7 @@ export function LoginPage() {
   return (
     <div className="min-h-screen flex">
       {/* ── Left Panel: Brand ─────────────────────────────────────── */}
-      <div className="hidden lg:flex lg:w-[52%] xl:w-[55%] bg-primary-700 flex-col relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-[52%] xl:w-[55%] bg-sa-charcoal flex-col relative overflow-hidden">
         {/* Background pattern */}
         <div className="absolute inset-0 opacity-10"
           style={{
@@ -323,12 +323,12 @@ export function LoginPage() {
         <div className="relative flex flex-col h-full px-10 py-10">
           {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-blue-500/80 flex items-center justify-center">
-              <Activity className="w-5 h-5 text-white" />
+            <div className="w-9 h-9 rounded-xl bg-sa-amber flex items-center justify-center">
+              <Activity className="w-5 h-5 text-sa-charcoal" />
             </div>
             <div>
-              <span className="text-xl font-bold text-white">NovaArc</span>
-              <span className="ml-2 text-xs font-bold bg-white/15 text-white/80 px-2 py-0.5 rounded uppercase tracking-wider">
+              <span className="text-xl font-bold text-white">Smart Agent</span>
+              <span className="ml-2 text-xs font-bold bg-sa-amber-soft text-sa-amber-strong px-2 py-0.5 rounded uppercase tracking-wider border border-sa-amber-strong/30">
                 RCM
               </span>
             </div>
@@ -343,7 +343,7 @@ export function LoginPage() {
             <h1 className="text-4xl xl:text-5xl font-bold text-white leading-tight">
               Revenue Cycle
               <br />
-              <span className="text-blue-300">Intelligence</span>
+              <span className="text-sa-amber">Intelligence</span>
             </h1>
             <p className="mt-5 text-base text-slate-300 leading-relaxed">
               AI-powered claims management, denial automation, and real-time analytics — built for modern healthcare organizations.
@@ -358,8 +358,8 @@ export function LoginPage() {
                 { label: 'NL Analytics Assistant',       desc: 'Query your AR data in plain English' },
               ].map(f => (
                 <div key={f.label} className="flex items-start gap-3">
-                  <div className="w-5 h-5 rounded-full bg-forest-500/80 flex items-center justify-center flex-shrink-0 mt-0.5">
-                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <div className="w-5 h-5 rounded-full bg-sa-amber flex items-center justify-center flex-shrink-0 mt-0.5">
+                    <svg className="w-3 h-3 text-sa-charcoal" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
                     </svg>
                   </div>
@@ -374,7 +374,7 @@ export function LoginPage() {
 
           {/* Footer */}
           <p className="text-xs text-slate-500">
-            © {new Date().getFullYear()} NovaArc Health Technologies. All rights reserved.
+            © {new Date().getFullYear()} Smart Agent Health Technologies. All rights reserved.
           </p>
         </div>
       </div>
@@ -383,10 +383,10 @@ export function LoginPage() {
       <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 bg-slate-50">
         {/* Mobile logo */}
         <div className="lg:hidden flex items-center gap-2.5 mb-8">
-          <div className="w-9 h-9 rounded-xl bg-primary-700 flex items-center justify-center">
-            <Activity className="w-5 h-5 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-sa-amber flex items-center justify-center">
+            <Activity className="w-5 h-5 text-sa-charcoal" />
           </div>
-          <span className="text-xl font-bold text-primary-700">NovaArc RCM</span>
+          <span className="text-xl font-bold text-slate-900">Smart Agent RCM</span>
         </div>
 
         <div className="w-full max-w-sm animate-slide-up">

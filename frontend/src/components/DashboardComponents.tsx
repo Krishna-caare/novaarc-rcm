@@ -11,7 +11,7 @@ interface MetricCardProps {
   icon:         React.ReactNode;
   iconBg?:      string;
   trend?:       'up' | 'down' | 'neutral';
-  accent?:      'blue' | 'green' | 'amber' | 'purple' | 'red' | 'none';
+  accent?:      'blue' | 'green' | 'amber' | 'amber-soft' | 'purple' | 'red' | 'none';
   subtitle?:    string;
 }
 

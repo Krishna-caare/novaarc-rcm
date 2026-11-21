@@ -21,7 +21,7 @@ ROLES = [
 
 def run_tests():
     print("=" * 60)
-    print("NovaArc RCM - Live End-to-End Verification")
+    print("Smart Agent RCM - Live End-to-End Verification")
     print(f"Backend:  {BASE_URL}")
     print(f"Frontend: {FRONTEND_URL}")
     print("=" * 60)
@@ -206,7 +206,7 @@ def run_tests():
             assert BASE_URL in r_js.text or "onrender.com" in r_js.text, "Backend URL not baked into bundle"
             print(f"  [PASS] Frontend bundle ({js_path}) contains production backend URL")
         else:
-            assert "/src/main.tsx" in r_html.text or "NovaArc" in r_html.text
+            assert "/src/main.tsx" in r_html.text or "Smart Agent" in r_html.text or "NovaArc" in r_html.text
             print(f"  [PASS] Frontend dev server running at {FRONTEND_URL} with live HMR")
         passed += 1
     except Exception as e:

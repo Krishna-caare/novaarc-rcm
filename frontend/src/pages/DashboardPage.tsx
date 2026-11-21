@@ -131,12 +131,12 @@ export function DashboardPage() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className="btn-secondary"
+            className="btn-secondary hover:border-sa-amber hover:text-sa-charcoal hover:bg-sa-amber-soft/20"
           >
             <RefreshCw className={cn('w-4 h-4', loading && 'animate-spin')} />
             Refresh
           </button>
-          <button className="btn-secondary">
+          <button className="btn-secondary hover:border-sa-amber hover:text-sa-charcoal hover:bg-sa-amber-soft/20">
             <Download className="w-4 h-4" />
             Export
           </button>
@@ -168,9 +168,9 @@ export function DashboardPage() {
             change={-2.3}
             changeLabel="vs last month"
             icon={<DollarSign className="w-5 h-5" />}
-            iconBg="bg-blue-100 text-blue-600"
+            iconBg="bg-sa-amber text-sa-charcoal"
             trend="down"
-            accent="blue"
+            accent="amber"
           />
           <MetricCard
             title="Collected (MTD)"
@@ -178,9 +178,9 @@ export function DashboardPage() {
             change={5.1}
             changeLabel="vs last month"
             icon={<CreditCard className="w-5 h-5" />}
-            iconBg="bg-forest-100 text-forest-600"
+            iconBg="bg-sa-amber-soft text-sa-charcoal"
             trend="up"
-            accent="green"
+            accent="amber-soft"
           />
           <MetricCard
             title="Collection Rate"
@@ -188,9 +188,9 @@ export function DashboardPage() {
             change={1.2}
             changeLabel="vs last month"
             icon={<TrendingUp className="w-5 h-5" />}
-            iconBg="bg-violet-100 text-violet-600"
+            iconBg="bg-sa-amber text-sa-charcoal"
             trend="up"
-            accent="purple"
+            accent="amber"
           />
           <MetricCard
             title="Total Claims"
@@ -198,9 +198,9 @@ export function DashboardPage() {
             change={3.5}
             changeLabel="vs last month"
             icon={<FileText className="w-5 h-5" />}
-            iconBg="bg-amber-100 text-amber-600"
+            iconBg="bg-sa-amber-soft text-sa-charcoal"
             trend="up"
-            accent="amber"
+            accent="amber-soft"
           />
         </div>
       )}
@@ -217,7 +217,7 @@ export function DashboardPage() {
                 className={cn(
                   'px-4 py-3.5 text-sm font-medium border-b-2 transition-all duration-150 whitespace-nowrap',
                   activeTab === tab.id
-                    ? 'border-primary-700 text-primary-700 bg-primary-50/30'
+                    ? 'border-sa-amber text-slate-900 font-semibold bg-sa-amber-soft/20'
                     : 'border-transparent text-slate-500 hover:text-slate-800 hover:border-slate-300',
                 )}
               >

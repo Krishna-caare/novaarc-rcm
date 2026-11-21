@@ -40,7 +40,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="NovaArc RCM",
+    title="Smart Agent RCM",
     description="Revenue Cycle Management with Agentic AI",
     version="1.0.0",
     lifespan=lifespan,

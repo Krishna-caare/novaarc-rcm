@@ -1,4 +1,4 @@
-# NovaArc RCM — Complete API & Service Reference Manual
+# Smart Agent RCM — Complete API & Service Reference Manual
 
 > **Target Audience**: AI Agents (resuming from truncated context), API Integrators, Backend & Frontend Developers.
 > **Backend Base URL (Local)**: `http://localhost:8000`

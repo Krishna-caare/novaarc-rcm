@@ -171,7 +171,7 @@ def build_viewer():
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>NovaArc RCM — Denial Knowledge Graph (Obsidian Engine)</title>
+  <title>Smart Agent RCM — Denial Knowledge Graph (Obsidian Engine)</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body {
@@ -563,7 +563,7 @@ def build_viewer():
     <div class="top-bar">
       <div class="brand-pill">
         <span class="dot"></span>
-        <span>NovaArc Knowledge Graph</span>
+        <span>Smart Agent Knowledge Graph</span>
       </div>
 
       <div class="search-wrapper">

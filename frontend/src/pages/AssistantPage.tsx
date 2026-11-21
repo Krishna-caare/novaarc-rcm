@@ -43,7 +43,7 @@ export function AssistantPage() {
         {
           id: 'welcome',
           role: 'assistant',
-          content: `Welcome to the NovaArc AI Assistant! I can help you with revenue cycle insights using natural language queries.
+          content: `Welcome to the Smart Agent AI Assistant! I can help you with revenue cycle insights using natural language queries.
 
 **Try asking me things like:**
 • "What's our AR over 90 days?"
@@ -183,7 +183,7 @@ I'll provide instant answers with data from your RCM system.`,
                   <span className="w-2 h-2 rounded-full bg-indigo-600 animate-bounce" style={{ animationDelay: '150ms' }} />
                   <span className="w-2 h-2 rounded-full bg-purple-600 animate-bounce" style={{ animationDelay: '300ms' }} />
                 </div>
-                <span className="text-xs font-semibold text-slate-700">NovaArc AI is analyzing revenue cycle data...</span>
+                <span className="text-xs font-semibold text-slate-700">Smart Agent AI is analyzing revenue cycle data...</span>
               </div>
               <p className="text-2xs text-slate-400">Synthesizing SQL queries, denial patterns & AR intelligence</p>
             </div>

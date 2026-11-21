@@ -70,12 +70,12 @@ export function getStatusBadge(status: string): { className: string; label: stri
 
 export function getPriorityBadge(priority: string): { className: string; label: string } {
   const priorityMap: Record<string, { className: string; label: string }> = {
-    critical: { className: 'badge-danger', label: 'Critical' },
-    high: { className: 'badge-danger', label: 'High' },
-    medium: { className: 'badge-warning', label: 'Medium' },
-    low: { className: 'badge-info', label: 'Low' },
+    critical: { className: 'badge bg-sa-amber-soft text-sa-amber-strong ring-1 ring-sa-amber-strong/40 font-bold', label: 'Critical' },
+    high:     { className: 'badge bg-sa-amber-soft text-sa-amber-strong ring-1 ring-sa-amber-strong/40 font-bold', label: 'High' },
+    medium:   { className: 'badge bg-sa-amber-soft text-sa-amber-strong ring-1 ring-sa-amber-strong/40 font-bold', label: 'Medium' },
+    low:      { className: 'badge bg-sa-amber-soft text-sa-amber-strong ring-1 ring-sa-amber-strong/40 font-bold', label: 'Low' },
   };
-  return priorityMap[priority] || { className: 'badge-neutral', label: priority };
+  return priorityMap[priority] || { className: 'badge bg-sa-amber-soft text-sa-amber-strong ring-1 ring-sa-amber-strong/40 font-bold', label: priority };
 }
 
 export function truncate(str: string, length: number): string {
